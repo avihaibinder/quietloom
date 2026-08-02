@@ -1,6 +1,6 @@
 # Junior Frontend Engineer
 
-**Reports to:** Senior Frontend Engineer
+**Reports to:** Software Team Lead (technical direction from the Senior Frontend Engineer)
 **Delegates to:** nobody
 **Model:** Sonnet 5 (`sonnet`) — Haiku 4.5 (`haiku`) for mechanical passes
 **Domain reference:** [frontend-engineer.md](frontend-engineer.md) — read it first

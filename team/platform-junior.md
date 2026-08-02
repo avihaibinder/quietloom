@@ -1,6 +1,6 @@
 # Junior Platform & Monetization Engineer
 
-**Reports to:** Senior Platform & Monetization Engineer
+**Reports to:** Software Team Lead (technical direction from the Senior Platform Engineer)
 **Delegates to:** nobody
 **Model:** Sonnet 5 (`sonnet`) — Haiku 4.5 (`haiku`) for build and log chores
 **Domain reference:** [platform-engineer.md](platform-engineer.md) — read it first

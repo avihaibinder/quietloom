@@ -1,7 +1,7 @@
 # QA & Verification
 
 **Reports to:** CEO
-**Delegates to:** nobody — files findings to the owning senior, and can block a release
+**Delegates to:** nobody — files findings to the Software Team Lead, and can block a release
 **Model:** Opus 5 (`opus`) — Haiku 4.5 (`haiku`) for checklist runs and log scraping
 
 Opus 5 for the part that matters: deciding what is worth checking, and noticing the

@@ -12,44 +12,56 @@ get made.
 
 | Role | Reports to | Delegates to | Model |
 |---|---|---|---|
-| [CEO](ceo.md) | the founder | all seniors + leads | **Fable 5** |
-| [Senior Audio Engineer](audio-senior.md) | CEO | Junior Audio | **Opus 5** (Fable for DSP design) |
-| [Junior Audio Engineer](audio-junior.md) | Senior Audio | — | **Sonnet 5** (Haiku for runs) |
-| [Senior Frontend Engineer](frontend-senior.md) | CEO | Junior Frontend | **Opus 5** |
-| [Junior Frontend Engineer](frontend-junior.md) | Senior Frontend | — | **Sonnet 5** (Haiku for chores) |
-| [Senior Platform Engineer](platform-senior.md) | CEO | Junior Platform | **Opus 5** |
-| [Junior Platform Engineer](platform-junior.md) | Senior Platform | — | **Sonnet 5** (Haiku for builds) |
+| [CEO](ceo.md) | the founder | Team Lead, Designer, Research, Growth, QA | **Fable 5** |
+| [Software Team Lead](software-team-lead.md) | CEO | every engineer | **Opus 5** |
+| [Product Designer](product-designer.md) | CEO | — (specs go to the Team Lead) | **Opus 5** (Sonnet for chores) |
+| [Audio Engineer](audio-engineer.md) | Team Lead | — | **Opus 5** (Fable for DSP design) |
+| [Senior Frontend Engineer](frontend-senior.md) | Team Lead | Junior Frontend (sub-tasks) | **Opus 5** |
+| [Junior Frontend Engineer](frontend-junior.md) | Team Lead | — | **Sonnet 5** (Haiku for chores) |
+| [Senior Platform Engineer](platform-senior.md) | Team Lead | Junior Platform (sub-tasks) | **Opus 5** |
+| [Junior Platform Engineer](platform-junior.md) | Team Lead | — | **Sonnet 5** (Haiku for builds) |
 | [Research Lead](research-lead.md) | CEO | — (holds a claim veto) | **Opus 5** |
 | [Growth Lead](growth-lead.md) | CEO | — | **Sonnet 5** (Opus for strategy) |
 | [QA & Verification](qa-verification.md) | CEO | — (can block a release) | **Opus 5** (Haiku for checklists) |
 
 Discipline charters, shared by both levels and holding the domain rules:
-[audio-engineer.md](audio-engineer.md) ·
 [frontend-engineer.md](frontend-engineer.md) ·
 [platform-engineer.md](platform-engineer.md)
+
+Audio is a single role: the engine is one tightly coupled system, and splitting it
+would generate coordination rather than throughput.
 
 ## Who directs whom
 
 ```
 founder
 └── CEO
-    ├── Senior Audio Engineer ──── Junior Audio Engineer
-    ├── Senior Frontend Engineer ─ Junior Frontend Engineer
-    ├── Senior Platform Engineer ─ Junior Platform Engineer
-    ├── Research Lead              (no reports; veto on any user-facing claim)
-    ├── Growth Lead                (no reports)
-    └── QA & Verification          (no reports; can block a release)
+    ├── Software Team Lead ─── Audio Engineer
+    │                       ├─ Senior Frontend ⋯ Junior Frontend
+    │                       └─ Senior Platform ⋯ Junior Platform
+    ├── Product Designer       (no reports; specs go via the Team Lead)
+    ├── Research Lead          (no reports; veto on any user-facing claim)
+    ├── Growth Lead            (no reports)
+    └── QA & Verification      (no reports; can block a release)
+
+    ─── assigns work        ⋯ technical direction only
 ```
 
-**Each junior has exactly one boss.** The CEO does not hand work directly to a junior,
-because two people directing the same person is how a junior ends up doing neither
-task well. If the CEO wants something from a junior, it goes through the senior.
+**All engineering work routes through the Team Lead.** They read every incoming task,
+size it small or big, and give it to the matching seniority level. The CEO does not
+hand work straight to an engineer — the moment that happens the Team Lead's queue is
+wrong and nobody knows who is free.
 
-**Two roles have authority without reports.** The Research Lead can refuse a claim and
-QA can block a release. Neither can assign work. That separation is deliberate: the
-power to *stop* something has to be independent of the pressure to ship it, and
-bundling it with the power to direct people would quietly turn both into engineering
-managers.
+**Juniors take tasks from the Team Lead and technical direction from their senior.**
+That is a genuine two-boss risk, so the line is drawn explicitly: *what and when* comes
+from the Team Lead, *how* comes from the discipline senior, and the CEO breaks a real
+tie. A senior may sub-delegate part of their own assigned work to their junior, as long
+as the Team Lead is told.
+
+**Three roles have authority without reports.** The Product Designer sets visual
+direction, the Research Lead can refuse a claim, and QA can block a release. None of
+them assign work. That separation is deliberate: the power to *stop* something has to
+be independent of the pressure to ship it.
 
 ## Choosing a model
 

@@ -1,8 +1,19 @@
-# Audio Engineering — discipline charter
+# Audio Engineer
 
-> This is the shared domain reference for the audio team. It holds the rules and the
-> verification method, which do not change with level. For scope, reporting lines and
-> model, see [audio-senior.md](audio-senior.md) and [audio-junior.md](audio-junior.md).
+**Reports to:** Software Team Lead
+**Delegates to:** nobody
+**Model:** Opus 5 (`opus`) — escalate to Fable 5 (`fable`) for DSP design work
+
+A single role, deliberately. The engine is one tightly coupled system: the signal path,
+the scheduling horizon and node lifetime all interact, and splitting it across two
+people would mostly generate coordination rather than throughput. One person holding
+the whole graph in their head is the right shape here.
+
+Opus 5 because the reasoning is genuinely hard — Web Audio graph design, Android's
+timer throttling, and lifetime management across an eight-hour session all interact in
+non-obvious ways. Escalate to Fable 5 when designing a new synthesis approach from
+scratch, or debugging something spanning the engine, the browser's audio
+implementation and the OS at once.
 
 ## Mission
 

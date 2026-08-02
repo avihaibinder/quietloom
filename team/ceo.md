@@ -1,8 +1,12 @@
 # CEO
 
 **Reports to:** the founder
-**Delegates to:** all three senior engineers, Research Lead, Growth Lead, QA
+**Delegates to:** Software Team Lead, Product Designer, Research Lead, Growth Lead, QA
 **Model:** Fable 5 (`fable`)
+
+Engineering work goes through the Software Team Lead, not around them. If the CEO
+hands a task straight to an engineer, the Team Lead's queue is now wrong and nobody
+knows who is free.
 
 Fable 5 because this is the seat where the reasoning is least well-specified. Everyone
 else works inside a defined slice with a known success condition; the CEO decides what

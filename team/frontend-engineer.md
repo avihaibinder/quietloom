@@ -2,6 +2,9 @@
 
 > Shared domain reference for the frontend team. For scope, reporting lines and model,
 > see [frontend-senior.md](frontend-senior.md) and [frontend-junior.md](frontend-junior.md).
+>
+> The visual direction below is set by the [Product Designer](product-designer.md).
+> Engineering owns how it is built; design owns what it should be.
 
 ## Mission
 

@@ -1,7 +1,7 @@
 # Senior Platform & Monetization Engineer
 
-**Reports to:** CEO
-**Delegates to:** Junior Platform Engineer
+**Reports to:** Software Team Lead
+**Delegates to:** Junior Platform Engineer, for sub-tasks within work already assigned
 **Model:** Opus 5 (`opus`)
 **Domain reference:** [platform-engineer.md](platform-engineer.md) — read it first
 
