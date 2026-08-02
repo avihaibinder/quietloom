@@ -24,6 +24,7 @@
  *     after 30s so a stalled SDK can never wedge the unlock flow.
  */
 
+import { Capacitor } from '@capacitor/core';
 import { bus } from '../core/bus.js';
 import { KEYS, read, write } from '../core/store.js';
 import { Entitlements } from './entitlements.js';
@@ -58,12 +59,11 @@ const REWARDED_TIMEOUT_MS = 30_000;
 /* ------------------------------------------------------------------------ *
  * Lazy, failure-tolerant plugin loading.
  *
- * The plugin is imported dynamically so that a desktop browser never even
- * evaluates the AdMob module. `dist/` is a static build; a bad import here
- * would take the whole app down at boot.
+ * @capacitor/core is static (safe on web, and needed synchronously). The AdMob
+ * module itself is imported dynamically so a desktop browser never evaluates
+ * it and a bad plugin can never take the boot down.
  * ------------------------------------------------------------------------ */
 
-let Capacitor = null;
 let AdMob = null;
 let E = null; // { BannerAdSize, BannerAdPosition, BannerAdPluginEvents, InterstitialAdPluginEvents, RewardAdPluginEvents }
 
@@ -77,13 +77,28 @@ let bannerListeners = []; // PluginListenerHandle[]
 
 /** Guards against two overlapping rewarded flows. */
 let rewardedInFlight = false;
+
+/**
+ * Why the last rewarded attempt did not pay out.
+ *
+ *   'unavailable' — no ad could be loaded or shown (no fill, network, timeout,
+ *                   wedged SDK). The user did nothing wrong.
+ *   'declined'    — an ad really played and they closed it early.
+ *   null          — the reward was earned.
+ *
+ * The paywall needs this distinction: isAvailable() only says the SDK came up,
+ * which is true even when the ad network cannot deliver a single impression.
+ * Treating a failed load as a decline is how you lock someone out of falling
+ * asleep, so the grace rule keys off this instead.
+ */
+let lastRewardedFailure = null;
 /** Guards against two overlapping interstitial flows. */
 let interstitialInFlight = false;
 
 /** True when we are running inside a Capacitor native shell. */
 function isNativeShell() {
   try {
-    return !!(Capacitor && Capacitor.isNativePlatform && Capacitor.isNativePlatform());
+    return !!Capacitor?.isNativePlatform?.();
   } catch {
     return false;
   }
@@ -150,16 +165,6 @@ export const Ads = {
   async init() {
     if (initialised || initFailed) return;
 
-    try {
-      const core = await import('@capacitor/core');
-      Capacitor = core.Capacitor;
-    } catch (err) {
-      // No Capacitor at all (plain `vite dev` in a browser). Perfectly normal.
-      console.info('[ads] Capacitor unavailable — ads disabled (browser mode)');
-      initFailed = true;
-      return;
-    }
-
     if (!isNativeShell()) {
       console.info('[ads] not a native platform — ads disabled');
       initFailed = true;
@@ -199,6 +204,18 @@ export const Ads = {
   /** False in a browser, false if init threw, false once premium/disabled. */
   isAvailable() {
     return canServe();
+  },
+
+  /**
+   * Why the last showRewarded() did not pay out: 'unavailable', 'declined', or
+   * null when it did. Callers deciding whether to be generous should branch on
+   * this, NOT on isAvailable() — the SDK can be perfectly healthy and still be
+   * unable to deliver a single ad.
+   *
+   * @returns {'unavailable'|'declined'|null}
+   */
+  lastRewardedFailure() {
+    return lastRewardedFailure;
   },
 
   /**
@@ -286,10 +303,14 @@ export const Ads = {
    */
   async hideBanner() {
     const wasNative = isNativeShell() && !!AdMob && initialised && !initFailed;
+    // Nothing was ever put on screen, so there is nothing to take down. Without
+    // this the plugin throws "you tried to hide a banner that was never shown"
+    // on every screen change before the first fill, which buries real errors.
+    const everRequested = bannerListeners.length > 0;
     bannerVisible = false;
     bannerHeightPx = 0;
 
-    if (wasNative) {
+    if (wasNative && everRequested) {
       try {
         await AdMob.hideBanner();
       } catch (err) {
@@ -379,10 +400,17 @@ export const Ads = {
    * @returns {Promise<boolean>}
    */
   async showRewarded() {
-    if (!canServe()) return false;
-    if (rewardedInFlight) return false;
+    if (!canServe()) {
+      lastRewardedFailure = 'unavailable';
+      return false;
+    }
+    if (rewardedInFlight) {
+      lastRewardedFailure = 'unavailable';
+      return false;
+    }
 
     rewardedInFlight = true;
+    lastRewardedFailure = 'unavailable'; // until something proves otherwise
     const handles = [];
     let timer = null;
 
@@ -394,9 +422,10 @@ export const Ads = {
         resolveDone = res;
       });
 
-      const finish = (ok) => {
+      const finish = (ok, reason = 'unavailable') => {
         if (settled) return;
         settled = true;
+        lastRewardedFailure = ok ? null : reason;
         resolveDone(ok);
       };
 
@@ -409,7 +438,9 @@ export const Ads = {
         }),
         listen(E.RewardAdPluginEvents.Dismissed, () => {
           // Order is not guaranteed; if Rewarded already fired we keep true.
-          finish(rewarded);
+          // Reaching here without a reward means an ad really played and they
+          // closed it early — the one case that is a genuine decline.
+          finish(rewarded, 'declined');
         }),
         listen(E.RewardAdPluginEvents.FailedToShow, (err) => {
           console.warn('[ads] rewarded failed to show', err);

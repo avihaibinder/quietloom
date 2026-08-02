@@ -5,6 +5,29 @@
  */
 
 export const PRESETS = [
+  // The first two use only free layers, deliberately. A new user who opens the
+  // app to a wall of padlocks decides it is a paywall and leaves; someone who
+  // gets something genuinely good for free is the one who later watches an ad.
+  {
+    id: 'rainfall',
+    name: 'Rainfall',
+    scene: 'rain',
+    note: 'Rain over a bed of pink noise — the two layers with the strongest evidence behind them. Free, always.',
+    layers: {
+      rain: { enabled: true, volume: 0.72, params: { intensity: 0.5 } },
+      pink: { enabled: true, volume: 0.3 },
+    },
+  },
+  {
+    id: 'tide',
+    name: 'Tide',
+    scene: 'waves',
+    note: 'Ocean swells at 0.1 Hz over brown noise. Breathe with the waves — in as it rises, out as it falls. Free, always.',
+    layers: {
+      ocean: { enabled: true, volume: 0.78 },
+      brown: { enabled: true, volume: 0.34 },
+    },
+  },
   {
     id: 'rainy-cabin',
     name: 'Rainy Cabin',

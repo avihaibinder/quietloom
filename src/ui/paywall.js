@@ -5,9 +5,10 @@
  *   1. Watch a short video  -> Ads.showRewarded() -> night pass until 11am.
  *   2. Premium forever      -> Billing.purchasePremium().
  *
- * GRACE RULE (deliberate, do not "fix"): if the rewarded ad returns false AND
- * ads are not actually available, we grant the pass anyway. Nobody gets locked
- * out of falling asleep because an ad server was slow.
+ * GRACE RULE (deliberate, do not "fix"): the pass is granted unless an ad
+ * genuinely played and the user closed it early. No fill, no network, a wedged
+ * SDK, a timeout — all of those unlock anyway. Nobody gets locked out of
+ * falling asleep because an ad server was having a bad night.
  */
 
 import { bus, toast } from '../core/bus.js';
@@ -180,15 +181,19 @@ async function runRewarded(btn) {
     earned = false;
   }
 
-  let available = false;
-  try {
-    available = Ads.isAvailable() === true;
-  } catch {
-    available = false;
-  }
-
   // THE GRACE RULE — an ad that never loaded is not a decline.
-  if (!earned && !available) earned = true;
+  //
+  // Branch on why it failed, not on Ads.isAvailable(): the SDK reports itself
+  // available as soon as it initialises, which stays true even when the network
+  // cannot deliver a single impression. Only a 'declined' outcome means an ad
+  // actually played and the user closed it early.
+  let reason = 'unavailable';
+  try {
+    reason = Ads.lastRewardedFailure();
+  } catch {
+    reason = 'unavailable';
+  }
+  if (!earned && reason !== 'declined') earned = true;
 
   busy = false;
   btn.classList.remove('is-busy');

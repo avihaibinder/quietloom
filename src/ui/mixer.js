@@ -270,17 +270,6 @@ function buildCard(id) {
         '<strong>Open-loop approximation.</strong> The original protocol phase-locked pulses to your slow oscillations using EEG. Drift has no EEG — it runs the same rhythm, not the same targeting.';
       body.append(notice);
     }
-  } else {
-    const lockNote = el('div', 'lock-note');
-    lockNote.append(el('p', null, 'Part of the full library. Unlock tonight for free with a short video.'));
-    const b = el('button', 'lock-cta', 'Unlock');
-    b.type = 'button';
-    b.addEventListener('click', (e) => {
-      e.stopPropagation();
-      openPaywall({ lockedIds: [id] });
-    });
-    lockNote.append(b);
-    body.append(lockNote);
   }
 
   card.append(body);
@@ -407,6 +396,14 @@ function wireMaster() {
 export function applyNurseryCap() {
   if (!masterInput || !engine) return;
   const safe = getSettings().nurserySafe === true;
+  // The engine also caps in the audio graph when it supports it (additive API).
+  if (typeof engine.setNurserySafe === 'function') {
+    try {
+      engine.setNurserySafe(safe);
+    } catch (err) {
+      console.warn('[ui] setNurserySafe failed', err);
+    }
+  }
   const max = safe ? Math.round(NURSERY_MAX * 100) : 100;
   masterInput.max = String(max);
   if (Number(masterInput.value) > max) {
