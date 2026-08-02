@@ -80,9 +80,43 @@ gracefully. But to actually watch a test ad play you need to **install the APK o
 real phone on a normal network**. That is the single most valuable thing you can do
 next, and it takes five minutes.
 
-**How it sounds.** The eleven layers were balanced by calculation, not by ear — there
-was no audio hardware available. If a preset sounds lopsided, the `TRIM` table at the
-top of `src/audio/engine.js` is the one place to adjust.
+**Whether you like how it sounds.** The synthesis is now measured rather than assumed —
+see below — but taste is yours. Listen to `samples/` and adjust the `TRIM` table at the
+top of `src/audio/engine.js` if anything sits wrong.
+
+---
+
+## Listen to it without a phone
+
+```powershell
+node tools/render-samples.mjs     # writes samples/*.wav
+node tools/analyse-samples.mjs    # reports what each one actually is
+```
+
+The first drives the real engine through an `OfflineAudioContext` in headless Chrome, so
+it needs no speakers and no device. The second reports crest factor, transient density,
+envelope modulation and A-weighted spectral balance per file.
+
+What the measurements confirm:
+
+| Check | Result |
+|---|---|
+| Ocean swell period | **10.0 s** — the 0.1 Hz breathing pacer, exact |
+| Binaural | crest 1.4 and 100% of weighted energy at 200–800 Hz: a clean 250 Hz sine pair |
+| Pink noise | flat per octave |
+| Brown noise | steep low-frequency tilt |
+| White noise | rising with bandwidth |
+| Thunder | 73% low, crest 19, sparse loud events |
+| Fire / crickets | 18 and 7 transients per second — grains are firing |
+| Level balance | continuous layers within a 5.5 dB window, peaks ≤ 0.35 |
+
+That process found two real faults that calculation had missed: wind was ~12 dB too
+quiet to hear next to anything else, and fire put 87% of its energy below 200 Hz so it
+read as a rumble instead of a crackle. Both are fixed.
+
+One methodological note worth keeping: unweighted, fire *still* measures 88% low and the
+fix looks like it failed. The ear is roughly 25 dB less sensitive at 100 Hz than at
+3 kHz, so the unweighted number was the wrong question. Use the A-weighted column.
 
 ---
 
