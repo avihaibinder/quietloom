@@ -314,7 +314,12 @@ export const Ads = {
       try {
         await AdMob.hideBanner();
       } catch (err) {
-        console.warn('[ads] hideBanner failed', err);
+        // A banner that was requested but never filled has no native view, and
+        // the plugin throws rather than no-opping. Expected, not worth a warning
+        // on every screen change - anything else still gets logged.
+        if (!/never shown/i.test(String(err?.message ?? err))) {
+          console.warn('[ads] hideBanner failed', err);
+        }
       }
       try {
         await AdMob.removeBanner();

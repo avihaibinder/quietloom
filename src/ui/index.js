@@ -28,7 +28,10 @@ import { Ads } from '../services/ads.js';
 
 export { closeTopSheet, anyLayerOpen };
 
-const DEFAULT_PRESET = 'rainy-cabin';
+// Deliberately a free preset. A first-ever launch that opens on a locked
+// sleepscape reads as a paywall, and the upsell lands better once someone has
+// actually heard how good the free tier sounds.
+const DEFAULT_PRESET = 'rainfall';
 
 let engine = null;
 let Scenes = null;
@@ -229,14 +232,38 @@ function sceneIntensity(state) {
   return Math.max(0.12, Math.min(1, blended));
 }
 
+let persistTimer = null;
+let pendingState = null;
+
+/** Dragging a slider fires `mix:changed` continuously — do not thrash storage. */
+function persistMix(state) {
+  pendingState = state;
+  if (persistTimer) return;
+  persistTimer = setTimeout(() => {
+    persistTimer = null;
+    const s = pendingState;
+    pendingState = null;
+    if (s) write(KEYS.lastMix, { master: s.master, layers: s.layers });
+  }, 400);
+}
+
 function wireSceneFollow() {
   bus.on('mix:changed', (state) => {
-    write(KEYS.lastMix, { master: state.master, layers: state.layers });
+    persistMix(state);
     try {
       Scenes?.setIntensity(sceneIntensity(state));
     } catch {
       /* renderer is optional */
     }
+  });
+
+  // Never lose the last mix to a backgrounded tab / process death.
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden || !pendingState) return;
+    if (persistTimer) clearTimeout(persistTimer);
+    persistTimer = null;
+    write(KEYS.lastMix, { master: pendingState.master, layers: pendingState.layers });
+    pendingState = null;
   });
 
   bus.on('scene:changed', ({ scene } = {}) => {
