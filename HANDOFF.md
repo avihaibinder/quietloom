@@ -1,9 +1,14 @@
 # Quietloom — Handoff
 
-Built overnight. This file is the honest state of things: what works, what is
-verified, what is not, and the shortest path from here to money.
+The honest state of things: what works, what is verified, what is not, and the
+shortest path from here to money.
 
-Read this first, then `BUSINESS.md` for the go-live checklist.
+Read this first, then `BUSINESS.md` for the go-live checklist and `team/` for who
+owns what.
+
+The first working version came out of a single build session. It is an ongoing
+product now, so treat this file as the current status rather than a delivery note —
+keep it true as things change.
 
 ---
 

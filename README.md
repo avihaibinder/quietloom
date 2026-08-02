@@ -1,4 +1,7 @@
-# Quietloom — Living Sleepscapes
+# Quietloom
+
+> New here? Read [`team/README.md`](team/README.md) for who owns what and the
+> standing product decisions, then your own charter in [`team/`](team/). — Living Sleepscapes
 
 A sleep-sounds app for Android where **every sound is synthesised in real time in the Web Audio
 API**. There are no audio files anywhere in the project. Rain, ocean, fire, wind, crickets, thunder,

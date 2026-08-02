@@ -111,7 +111,7 @@ means you lose the revenue and often the account. Never tap your own ads, never 
 ads, and never test with real ad unit IDs on your own device without registering it as a test
 device. Section 3 covers this.
 
-**A one-night build has one-night-build risks.** There is no crash reporting, no server, no
+**A young codebase has young-codebase risks.** There is no crash reporting, no server, no
 analytics, and the billing module is a stub. Ship the ads first, prove there is an audience, and
 only then spend money on the rest.
 
