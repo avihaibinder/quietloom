@@ -1,0 +1,11 @@
+{
+  "appId": "com.drift.sleepscapes",
+  "appName": "Drift",
+  "webDir": "dist",
+  "backgroundColor": "#05070c",
+  "android": {
+    "backgroundColor": "#05070c",
+    "allowMixedContent": false,
+    "webContentsDebuggingEnabled": true
+  }
+}

@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
+    />
+    <meta name="theme-color" content="#05070c" />
+    <meta name="color-scheme" content="dark" />
+    <title>Drift — Living Sleepscapes</title>
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <canvas id="scene-canvas" aria-hidden="true"></canvas>
+    <div id="scene-scrim" aria-hidden="true"></div>
+
+    <!-- ===== Mixer (main screen) ===== -->
+    <main id="screen-mixer">
+      <header class="app-head">
+        <div class="brand">
+          <h1>Drift</h1>
+          <p class="tagline">Living sleepscapes, generated in real time</p>
+        </div>
+        <button id="btn-premium" class="ghost-btn" type="button">Premium</button>
+      </header>
+
+      <section class="block">
+        <div class="block-head">
+          <h2>Sleepscapes</h2>
+          <button id="btn-mixes" class="link-btn" type="button">My mixes</button>
+        </div>
+        <div id="preset-row" class="preset-row" aria-label="Presets"></div>
+        <p id="preset-note" class="preset-note" hidden></p>
+      </section>
+
+      <section class="block">
+        <div class="block-head">
+          <h2>Layers</h2>
+          <button id="btn-legend" class="link-btn" type="button">What the badges mean</button>
+        </div>
+        <div id="sound-list" class="sound-list" aria-label="Sound layers"></div>
+      </section>
+
+      <section class="master-row">
+        <div class="master-head">
+          <label for="master-slider">Volume</label>
+          <span id="master-value" class="master-value">70</span>
+          <button id="btn-volume-guide" class="info-dot" type="button" aria-label="How loud should this be?">i</button>
+        </div>
+        <input id="master-slider" type="range" min="0" max="100" value="70" aria-describedby="master-note" />
+        <p id="master-note" class="master-note"></p>
+      </section>
+
+      <p class="disclaimer">
+        Drift is a relaxation and sound-masking tool, not a medical device. Every claim in this app links
+        to the study behind it.
+      </p>
+
+      <div id="banner-spacer"></div>
+    </main>
+
+    <!-- ===== Bottom bar ===== -->
+    <nav id="bottom-bar" class="bottom-bar">
+      <button id="btn-play" class="play-btn" type="button" aria-label="Play">
+        <svg class="ico ico-play" viewBox="0 0 24 24" aria-hidden="true"><path d="M8.5 5.2v13.6L19 12z" /></svg>
+        <svg class="ico ico-pause" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5h3.1v14H8zM12.9 5H16v14h-3.1z" /></svg>
+        <span class="play-label">Play</span>
+      </button>
+      <button id="btn-timer" class="bar-btn" type="button">
+        <svg class="ico" viewBox="0 0 24 24" aria-hidden="true">
+          <circle cx="12" cy="13.4" r="7.1" /><path d="M12 9.8v3.6l2.5 1.5M9.5 3.2h5" />
+        </svg>
+        <span class="bar-label">Timer</span>
+      </button>
+      <button id="btn-breathe" class="bar-btn" type="button">
+        <svg class="ico" viewBox="0 0 24 24" aria-hidden="true">
+          <circle cx="12" cy="12" r="8.2" /><circle cx="12" cy="12" r="3.4" />
+        </svg>
+        <span class="bar-label">Breathe</span>
+      </button>
+      <button id="btn-bedside" class="bar-btn" type="button">
+        <svg class="ico" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M19.6 14.5A7.7 7.7 0 0 1 9.5 4.4a7.9 7.9 0 1 0 10.1 10.1z" />
+        </svg>
+        <span class="bar-label">Bedside</span>
+      </button>
+    </nav>
+
+    <!-- ===== Overlays ===== -->
+    <div id="bedside-overlay" class="overlay hidden">
+      <div id="bedside-clock" class="bedside-clock">--:--</div>
+      <div id="bedside-sub" class="bedside-sub"></div>
+      <button id="bedside-exit" class="bedside-exit" type="button">Tap anywhere to exit</button>
+    </div>
+
+    <div id="breathing-overlay" class="overlay hidden"></div>
+    <div id="timer-sheet" class="sheet hidden"></div>
+    <div id="unlock-sheet" class="sheet hidden"></div>
+    <div id="evidence-sheet" class="sheet hidden"></div>
+    <div id="mixes-sheet" class="sheet hidden"></div>
+    <div id="toast-host" class="toast-host"></div>
+
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>

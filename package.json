@@ -1,0 +1,26 @@
+{
+  "name": "drift-sleepscapes",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Drift — Living Sleepscapes. Generative, research-backed sleep sounds.",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "sync": "npm run build && npx cap sync android",
+    "android": "powershell -ExecutionPolicy Bypass -File scripts/build-apk.ps1"
+  },
+  "dependencies": {
+    "@anuradev/capacitor-background-mode": "^7.2.1",
+    "@capacitor-community/admob": "7.2.0",
+    "@capacitor-community/keep-awake": "7.1.0",
+    "@capacitor/android": "7.6.8",
+    "@capacitor/app": "7.1.2",
+    "@capacitor/core": "7.6.8"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "7.6.8",
+    "vite": "^7.0.0"
+  }
+}
