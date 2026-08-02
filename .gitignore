@@ -13,3 +13,6 @@ android/app/src/main/assets/public/
 android/app/src/main/res/xml/config.xml
 *.keystore
 !debug.keystore
+
+# Rendered audio previews (regenerate with: node tools/render-samples.mjs)
+samples/

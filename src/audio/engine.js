@@ -90,8 +90,15 @@ const TRIM = {
   rain: 0.55,
   thunder: 1.0,
   ocean: 0.6,
-  wind: 0.55,
-  fire: 0.7,
+  // Measured against the other continuous layers at an identical slider
+  // position, wind came out ~12 dB quiet - inaudible the moment anything else
+  // was playing. Bandpassed noise carries far less energy than the broadband
+  // beds it sits next to, which is not obvious until you render and measure it.
+  wind: 1.3,
+  // Raised to compensate for the crackle-forward rebalance inside fire.js: the
+  // low bed carried most of the layer's energy, so trading it for grain detail
+  // cost ~7 dB of level even though it gained presence.
+  fire: 1.5,
   crickets: 0.22,
   pink: 0.5,
   brown: 0.45,
