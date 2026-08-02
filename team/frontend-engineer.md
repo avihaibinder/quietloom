@@ -1,4 +1,7 @@
-# Frontend Engineer
+# Frontend Engineering — discipline charter
+
+> Shared domain reference for the frontend team. For scope, reporting lines and model,
+> see [frontend-senior.md](frontend-senior.md) and [frontend-junior.md](frontend-junior.md).
 
 ## Mission
 

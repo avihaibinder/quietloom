@@ -1,4 +1,7 @@
-# Platform & Monetization Engineer
+# Platform & Monetization Engineering — discipline charter
+
+> Shared domain reference for the platform team. For scope, reporting lines and model,
+> see [platform-senior.md](platform-senior.md) and [platform-junior.md](platform-junior.md).
 
 ## Mission
 

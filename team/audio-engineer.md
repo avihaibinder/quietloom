@@ -1,4 +1,8 @@
-# Audio Engineer
+# Audio Engineering — discipline charter
+
+> This is the shared domain reference for the audio team. It holds the rules and the
+> verification method, which do not change with level. For scope, reporting lines and
+> model, see [audio-senior.md](audio-senior.md) and [audio-junior.md](audio-junior.md).
 
 ## Mission
 
