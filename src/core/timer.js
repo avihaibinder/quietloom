@@ -1,5 +1,5 @@
 /**
- * Sleep timer. Deadline-based (never accumulated ticks, which drift when the OS
+ * Sleep timer. Deadline-based (never accumulated ticks, which quietloom when the OS
  * throttles JS). The audible fade is handed to the audio engine so it runs on the
  * audio clock and survives a throttled or suspended main thread.
  */

@@ -36,7 +36,7 @@ let ready = false;
 
 export const Billing = {
   /** Must match the product ID created in the Play Console, exactly. */
-  PRODUCT_ID: 'drift_premium_forever',
+  PRODUCT_ID: 'quietloom_premium_forever',
 
   /**
    * Shown in the paywall. Once billing is live, replace this at runtime with
@@ -180,9 +180,9 @@ export const Billing = {
    * only in localStorage.
    *
    * Also reachable from the device via Chrome DevTools / adb as:
-   *     window.__drift.grantPremium(true)
+   *     window.__quietloom.grantPremium(true)
    *
-   * >>> DELETE THIS METHOD, AND THE window.__drift BLOCK BELOW, BEFORE ANY <<<
+   * >>> DELETE THIS METHOD, AND THE window.__quietloom BLOCK BELOW, BEFORE ANY <<<
    * >>> PUBLIC RELEASE.                                                    <<<
    *
    * @param {boolean} [on=true]
@@ -205,6 +205,6 @@ export const Billing = {
  * A comment saying "delete before release" would not have survived a busy week.
  */
 if (import.meta.env.DEV && typeof window !== 'undefined') {
-  window.__drift = window.__drift || {};
-  window.__drift.grantPremium = (on = true) => Billing.__grantPremiumForTesting(on);
+  window.__quietloom = window.__quietloom || {};
+  window.__quietloom.grantPremium = (on = true) => Billing.__grantPremiumForTesting(on);
 }

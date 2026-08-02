@@ -44,7 +44,7 @@ function render() {
     el(
       'p',
       'evidence-claim',
-      'Loud enough to mask, quiet enough to sleep through. Those are two different numbers, and the gap is why Drift turns itself off.',
+      'Loud enough to mask, quiet enough to sleep through. Those are two different numbers, and the gap is why Quietloom turns itself off.',
     ),
   );
 

@@ -1,5 +1,5 @@
 /**
- * The single seam between Drift and Capacitor.
+ * The single seam between Quietloom and Capacitor.
  *
  * Nothing else in the app may import a Capacitor plugin directly. Every method
  * here is safe to call in a desktop browser, where they all degrade to no-ops

@@ -1,4 +1,4 @@
-# Drift — Living Sleepscapes
+# Quietloom — Living Sleepscapes
 
 A sleep-sounds app for Android where **every sound is synthesised in real time in the Web Audio
 API**. There are no audio files anywhere in the project. Rain, ocean, fire, wind, crickets, thunder,
@@ -11,7 +11,7 @@ badge (Strong / Moderate / Emerging / Traditional) and an info card that links t
 peer-reviewed paper. See [`research.md`](research.md) for the full source list, and
 [`BUSINESS.md`](BUSINESS.md) for monetisation, the go-live checklist and the launch plan.
 
-Package ID: `com.drift.sleepscapes`
+Package ID: `com.quietloom.app`
 
 ## Stack
 

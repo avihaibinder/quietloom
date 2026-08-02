@@ -1,5 +1,5 @@
 /**
- * The evidence sheet — Drift's differentiator.
+ * The evidence sheet — Quietloom's differentiator.
  *
  * Every sound, the breathing pacer and the volume guide all render through
  * `renderEvidence()`, so a citation always looks the same wherever it appears.
@@ -115,7 +115,7 @@ export function renderEvidence(container, data, { eyebrow = 'The evidence' } = {
   const foot = el(
     'p',
     'evidence-foot',
-    'Drift is not a medical device. Sample sizes in this literature are small and effects vary between people.',
+    'Quietloom is not a medical device. Sample sizes in this literature are small and effects vary between people.',
   );
   container.append(foot);
 }
@@ -143,7 +143,7 @@ export function openBadgeLegend() {
   body.textContent = '';
   body.append(
     sheetHeader('How to read the badges', {
-      eyebrow: 'Drift cites its sources',
+      eyebrow: 'Quietloom cites its sources',
       onClose: () => closeSheet(SHEET_ID),
     }),
   );
@@ -151,7 +151,7 @@ export function openBadgeLegend() {
     el(
       'p',
       'evidence-claim',
-      'Most sleep apps tell you a sound works. Drift tells you how well it is evidenced — including when the answer is "not very".',
+      'Most sleep apps tell you a sound works. Quietloom tells you how well it is evidenced — including when the answer is "not very".',
     ),
   );
 

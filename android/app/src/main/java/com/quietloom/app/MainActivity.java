@@ -1,4 +1,4 @@
-package com.drift.sleepscapes;
+package com.quietloom.app;
 
 import android.media.AudioManager;
 import android.os.Bundle;

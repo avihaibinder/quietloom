@@ -267,7 +267,7 @@ function buildCard(id) {
     if (id === 'deeppulse') {
       const notice = el('div', 'notice');
       notice.innerHTML =
-        '<strong>Open-loop approximation.</strong> The original protocol phase-locked pulses to your slow oscillations using EEG. Drift has no EEG — it runs the same rhythm, not the same targeting.';
+        '<strong>Open-loop approximation.</strong> The original protocol phase-locked pulses to your slow oscillations using EEG. Quietloom has no EEG — it runs the same rhythm, not the same targeting.';
       body.append(notice);
     }
   }

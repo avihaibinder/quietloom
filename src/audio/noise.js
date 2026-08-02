@@ -1,7 +1,7 @@
 /**
  * Noise buffer factory, plus the shared helpers every grain-based layer uses.
  *
- * Drift ships zero audio files (research.md §7). Every continuous layer is an
+ * Quietloom ships zero audio files (research.md §7). Every continuous layer is an
  * AudioBufferSourceNode looping a ~10 s buffer of generated noise. Noise has no
  * audible period, so a loop point is imperceptible — provided the seam itself is
  * smooth. Each buffer is therefore generated slightly long and its tail is

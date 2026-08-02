@@ -9,7 +9,7 @@
  * during ON blocks and overnight word recall improved (research.md §1).
  *
  * IMPORTANT — WHAT THIS IS NOT.
- * Drift has no EEG. It cannot see your slow oscillations, so it cannot phase-lock
+ * Quietloom has no EEG. It cannot see your slow oscillations, so it cannot phase-lock
  * to them. This layer reproduces the *stimulation pattern* — the rate, the block
  * structure, the pulse shape — and nothing else. It is an open-loop approximation
  * of the protocol, not the protocol, and the app badges it Experimental for

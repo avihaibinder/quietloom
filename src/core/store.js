@@ -4,13 +4,13 @@
  */
 
 export const KEYS = {
-  mixes: 'drift.mixes',
-  lastMix: 'drift.lastMix',
-  premium: 'drift.premium',
-  nightPass: 'drift.nightPass',
-  lastInterstitialDay: 'drift.lastInterstitialDay',
-  settings: 'drift.settings',
-  seenIntro: 'drift.seenIntro',
+  mixes: 'quietloom.mixes',
+  lastMix: 'quietloom.lastMix',
+  premium: 'quietloom.premium',
+  nightPass: 'quietloom.nightPass',
+  lastInterstitialDay: 'quietloom.lastInterstitialDay',
+  settings: 'quietloom.settings',
+  seenIntro: 'quietloom.seenIntro',
 };
 
 export function read(key, fallback = null) {

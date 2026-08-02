@@ -23,7 +23,7 @@
  * phase offset (2π·f·tStart) at construction. That means `engine.getOceanPhase()`
  * is exact, is valid whether or not the ocean layer is even running, and stays
  * correct across enable/disable — the UI breathing animation can be driven
- * straight from it with no message passing and no drift.
+ * straight from it with no message passing and no quietloom.
  */
 
 import { getNoiseBuffer } from '../noise.js';

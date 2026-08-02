@@ -1,6 +1,6 @@
 # Monetization wiring
 
-How `ads.js`, `native.js` and `billing.js` connect to the rest of Drift, what
+How `ads.js`, `native.js` and `billing.js` connect to the rest of Quietloom, what
 they promise, and what the app owner still has to do.
 
 Status as of this build: **`src/main.js` and `src/ui/*` are already wired
@@ -31,7 +31,7 @@ Never `await` either init on the critical path to first paint.
 `Native` needs no init. `Native.isNative()` is **synchronous and correct on the
 very first call**, including before any plugin has finished loading —
 `@capacitor/core` is imported statically for exactly this reason. (The
-`setTimeout(..., 0)` around the `[drift] ready` log in `main.js` is no longer
+`setTimeout(..., 0)` around the `[quietloom] ready` log in `main.js` is no longer
 necessary; harmless if left.)
 
 ---
@@ -123,7 +123,7 @@ To demo the premium UI tonight without a Play Console:
 ```js
 Billing.__grantPremiumForTesting(true);
 // or, from a connected DevTools console (chrome://inspect):
-window.__drift.grantPremium(true);
+window.__quietloom.grantPremium(true);
 ```
 
 ---
@@ -203,7 +203,7 @@ service of type `mediaPlayback` driven by a `MediaSession`. The
 `FOREGROUND_SERVICE_MEDIA_PLAYBACK` permission is **already declared** in
 `AndroidManifest.xml`. It needs no extra permissions, gives a proper lockscreen
 transport, and passes Play review. It is a ~150-line Java change in
-`android/app/src/main/java/com/drift/sleepscapes/`, not a plugin install.
+`android/app/src/main/java/com/quietloom/sleepscapes/`, not a plugin install.
 
 ---
 
@@ -218,7 +218,7 @@ Reasons the UI may receive (`BILLING_REASONS`): `unavailable`, `cancelled`,
 
 Wiring it later is three marked blocks — search `billing.js` for
 **`TODO(billing)`**. Each contains the exact code to paste. Product ID is
-`drift_premium_forever`. Note `cordova-plugin-purchase` attaches to
+`quietloom_premium_forever`. Note `cordova-plugin-purchase` attaches to
 `window.CdvPurchase`; it is **not** an ES module, so do not `import` it.
 
 ---
@@ -261,7 +261,7 @@ Keep them ASCII, or save as UTF-8 **with BOM**.
    `com.google.android.gms.ads.APPLICATION_ID` is currently Google's public test
    ID `ca-app-pub-3940256099942544~3347511713`.
    Leaving the test app-ID with real units, or vice versa, means zero revenue.
-3. **Delete `Billing.__grantPremiumForTesting()` and the `window.__drift` block**
+3. **Delete `Billing.__grantPremiumForTesting()` and the `window.__quietloom` block**
    at the bottom of `src/services/billing.js`. It grants premium to anyone who
    opens DevTools.
 4. **AdMob policy:** apps serving ads to EEA/UK users need a consent flow. The

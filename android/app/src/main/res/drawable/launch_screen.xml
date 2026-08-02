@@ -2,10 +2,10 @@
 <!--
     Launch background. Capacitor ships a white splash.png, which means a full-brightness
     white flash every time someone opens a sleep app in a dark room. This replaces it
-    with the app's own near-black and the Drift mark.
+    with the app's own near-black and the Quietloom mark.
 -->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <item android:drawable="@color/driftNight" />
+    <item android:drawable="@color/quietloomNight" />
     <item
         android:width="132dp"
         android:height="132dp"

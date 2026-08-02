@@ -1,4 +1,4 @@
-# Drift — Handoff
+# Quietloom — Handoff
 
 Built overnight. This file is the honest state of things: what works, what is
 verified, what is not, and the shortest path from here to money.
@@ -23,10 +23,10 @@ npm install
 .\scripts\build-apk.ps1
 ```
 
-**Drift — Living Sleepscapes** (`com.drift.sleepscapes`) is a sleep-sounds app where
+**Quietloom — Living Sleepscapes** (`com.quietloom.app`) is a sleep-sounds app where
 every sound is synthesised in real time by the Web Audio API. There is not a single
 audio file in the project. That is the product, not a shortcut: a recording loops, and
-once you notice the loop point you cannot un-notice it. Drift never repeats, weighs
+once you notice the loop point you cannot un-notice it. Quietloom never repeats, weighs
 almost nothing, and costs nothing in licensing — forever.
 
 The positioning is **the only sleep app that cites its sources**. Every sound carries an
@@ -163,7 +163,7 @@ fix looks like it failed. The ear is roughly 25 dB less sensitive at 100 Hz than
 
 It reproduces the *pulse pattern* from Papalambros 2017 open-loop — five pink-noise
 pulses at ~0.8 Hz, then a matching gap. The actual study phase-locked those pulses to
-each slow oscillation using live EEG. Drift has no EEG and cannot do that. It is
+each slow oscillation using live EEG. Quietloom has no EEG and cannot do that. It is
 labelled "Experimental" in the app and in `research.md` for exactly this reason. Keep it
 that way; over-claiming health benefits is how wellness apps get pulled.
 

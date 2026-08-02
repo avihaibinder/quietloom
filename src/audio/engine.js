@@ -1,7 +1,7 @@
 /**
  * The generative audio engine.
  *
- * Zero audio files. Every sound in Drift is synthesised at runtime from plain
+ * Zero audio files. Every sound in Quietloom is synthesised at runtime from plain
  * standard AudioNodes — no AudioWorklet, no ScriptProcessor — so it never loops
  * and never repeats (research.md §7).
  *

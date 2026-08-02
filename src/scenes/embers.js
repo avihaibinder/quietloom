@@ -40,7 +40,7 @@ function makePart(env, seeded) {
     y: seeded ? rand(0, env.h) : env.h + rand(0, 60),
     size,
     v: rand(14, 46) * (1 + (5.4 - size) * 0.08),
-    drift: rand(-9, 9),
+    quietloom: rand(-9, 9),
     wob: rand(0, Math.PI * 2),
     wobSpeed: rand(0.5, 1.6),
     flick: rand(0, Math.PI * 2),
@@ -116,7 +116,7 @@ export const embers = {
       p.y -= p.v * dt * (0.55 + 0.75 * env.intensity);
       p.wob += p.wobSpeed * dt;
       p.flick += p.flickSpeed * dt;
-      p.x += (p.drift + Math.sin(p.wob) * 12) * dt;
+      p.x += (p.quietloom + Math.sin(p.wob) * 12) * dt;
 
       const h = env.h || 1;
       const rise = 1 - p.y / h; // 0 at the bottom, 1 at the top

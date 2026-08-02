@@ -1,7 +1,7 @@
 /**
  * Bottom-sheet + overlay layer manager.
  *
- * Every modal surface in Drift registers here so that:
+ * Every modal surface in Quietloom registers here so that:
  *   - a backdrop tap closes the top-most surface,
  *   - Android back can close one surface at a time (`closeTopSheet()`),
  *   - nothing can ever be opened twice and stack on top of itself.

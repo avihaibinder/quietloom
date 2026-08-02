@@ -3,7 +3,7 @@
  *
  *   noise loop -> shaping filter -> out
  *
- * Pink is Drift's default because it is the colour with the best evidence: steady
+ * Pink is Quietloom's default because it is the colour with the best evidence: steady
  * pink noise reduced EEG complexity and raised the percentage of stable sleep
  * time (research.md §1). Most apps default to white, which the literature
  * supports less well — so white here gets a gentle 7 kHz lowpass to take the

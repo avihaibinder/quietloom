@@ -1,4 +1,4 @@
-# Drift — Business, Monetisation and Go-Live
+# Quietloom — Business, Monetisation and Go-Live
 
 This is the commercial half of the project. The engineering half is in `README.md`, and the
 scientific half is in `research.md`. This document is written for you, the owner: you can read code,
@@ -12,11 +12,11 @@ job gated behind a few slower administrative steps.
 
 ---
 
-## 1. What Drift is, and why it can make money
+## 1. What Quietloom is, and why it can make money
 
 ### The product in one paragraph
 
-Drift is an Android sleep-sounds app in which every sound is synthesised in real time by the Web
+Quietloom is an Android sleep-sounds app in which every sound is synthesised in real time by the Web
 Audio API. There are no audio files in the project at all. Rain is filtered noise shaped by a
 stochastic droplet model; ocean is a 0.1 Hz swell envelope over band-limited noise; fire is
 crackle transients over a low rumble. All of it is multiplied by a slow 1/f amplitude envelope,
@@ -49,11 +49,11 @@ Sounds, Noisli and a hundred others already own the obvious search terms. You ar
 
 ### The moat, such as it is
 
-Three things about Drift are genuinely hard for an incumbent to copy quickly.
+Three things about Quietloom are genuinely hard for an incumbent to copy quickly.
 
 **Nobody else cites their sources.** Search the Play Store for sleep apps and you will find a
 thousand claims — "scientifically designed", "clinically proven", "engineered by sleep experts" —
-attached to precisely zero references. Drift puts an evidence badge on every layer (Strong /
+attached to precisely zero references. Quietloom puts an evidence badge on every layer (Strong /
 Moderate / Emerging / Traditional) and an info card that links to the actual paper on PubMed or
 Frontiers. It also ships the *counter*-evidence: the white-noise card links to Riedy 2021, the
 systematic review that rated the evidence for continuous noise as "very low". That is a genuinely
@@ -64,7 +64,7 @@ It shows up in the defaults, which is what makes it credible rather than decorat
 - Pink noise is the default, not white, because Zhou 2012 is the strongest noise result available
   and it used pink. Almost every competitor defaults to white.
 - The sleep timer defaults **ON at 45 minutes**. The evidence supports sound for sleep *onset* far
-  better than it supports eight hours of continuous noise. Drift is the only sleep app I am aware of
+  better than it supports eight hours of continuous noise. Quietloom is the only sleep app I am aware of
   that is designed to turn itself off. This costs us ad impressions and we do it anyway, which is
   precisely why anyone will believe the rest of it.
 - The ocean swell is locked to exactly ten seconds — 0.1 Hz — so the waves are a six-breaths-per-
@@ -76,14 +76,14 @@ It shows up in the defaults, which is what makes it credible rather than decorat
   sound machines. Essentially nobody ships this.
 
 **Zero content cost, forever.** Every competitor either licensed a sound library or recorded one.
-That is a fixed cost, an ongoing licence risk, and a reason their APKs are 80–300 MB. Drift's audio
+That is a fixed cost, an ongoing licence risk, and a reason their APKs are 80–300 MB. Quietloom's audio
 is a few kilobytes of JavaScript. Your gross margin on this app is effectively 100% minus Google's
 cut, and it stays that way at any scale.
 
 **Synthesis is a real feature, not a technicality.** A recording loops. Once a user notices the loop
 point they cannot un-notice it, and the app is ruined for them. This is one of the single most
 common one-star complaints in the entire category — go read the reviews of any competitor and count
-how many mention looping. Drift physically cannot loop. That is a review-driven, word-of-mouth
+how many mention looping. Quietloom physically cannot loop. That is a review-driven, word-of-mouth
 advantage that compounds.
 
 ### The honest risks
@@ -167,7 +167,7 @@ rule encoded in the code and it is not negotiable. An unexpected loud advertisem
 real harm to the person you are supposed to be helping, and it is also the fastest route to
 one-star reviews in a category where reviews are everything.
 
-**In-app purchase — "Premium forever", `drift_premium_forever`, $4.99.** Every layer, every scene,
+**In-app purchase — "Premium forever", `quietloom_premium_forever`, $4.99.** Every layer, every scene,
 no ads, forever. The scaffold exists in `src/services/billing.js` but is currently a stub that
 reports "coming soon", so the paywall gracefully falls back to offering the free rewarded unlock.
 Wiring it is step 9 of the checklist.
@@ -282,7 +282,7 @@ pay you. AdMob pays out monthly once your balance passes **$100**.
 
 **Step 2. Create the app in AdMob.** *Apps → Add app → Android.* If the app is not yet on Google
 Play, choose "No, it is not listed yet" — you can link it to the Play listing later, and you should,
-because linked apps get better optimisation data. Name it Drift.
+because linked apps get better optimisation data. Name it Quietloom.
 
 AdMob gives you an **application ID** that looks like `ca-app-pub-1234567890123456~9876543210`. Note
 the **tilde**. Write it down.
@@ -292,9 +292,9 @@ three, and give them these names so the AdMob reports are readable later:
 
 | Ad unit name | Format | Settings |
 |---|---|---|
-| `drift-banner-mixer` | Banner | Leave the auto-refresh at 60 seconds |
-| `drift-interstitial-open` | Interstitial | Default |
-| `drift-rewarded-nightpass` | Rewarded | Reward item: name `nightpass`, amount `1` |
+| `quietloom-banner-mixer` | Banner | Leave the auto-refresh at 60 seconds |
+| `quietloom-interstitial-open` | Interstitial | Default |
+| `quietloom-rewarded-nightpass` | Rewarded | Reward item: name `nightpass`, amount `1` |
 
 Each gives you an **ad unit ID** that looks like `ca-app-pub-1234567890123456/1122334455`. Note the
 **slash**. The half before the separator is the same publisher ID in all four values; only the
@@ -424,14 +424,14 @@ work through everything with a red mark next to it. The parts that matter:
   or marketing**. Declare no other collection, because there is none. Make sure this matches
   `PRIVACY.md` word for word in substance; Google compares them and a mismatch is a common
   rejection.
-- **Content rating questionnaire** — answer honestly; Drift should come out as Everyone / PEGI 3.
+- **Content rating questionnaire** — answer honestly; Quietloom should come out as Everyone / PEGI 3.
 - **Target audience and content** — set this to **13+ or 18+**. Do *not* declare children as a
   target audience. It is tempting because of the nursery-safe cap, but declaring a child audience
   pulls the app into Google Play's Families policy, which forbids standard AdMob serving and
   requires a certified ads SDK with a different configuration. The nursery cap is a feature for a
   *parent* operating the phone. Keep the declared audience adult.
 - **Ads declaration** — yes, this app contains ads.
-- **Health claims** — nowhere in your listing may you say Drift treats, cures or is clinically
+- **Health claims** — nowhere in your listing may you say Quietloom treats, cures or is clinically
   proven to fix insomnia. Descriptive and cited is fine. Therapeutic claims will get the listing
   rejected and are also not true.
 
@@ -441,16 +441,16 @@ Every Android release must be signed. Generate the key once and never lose it:
 
 ```bash
 keytool -genkeypair -v \
-  -keystore drift-upload.jks \
+  -keystore quietloom-upload.jks \
   -keyalg RSA -keysize 4096 -validity 10000 \
-  -alias drift-upload
+  -alias quietloom-upload
 ```
 
 On Windows, `keytool.exe` lives at `C:\Program Files\Android\Android Studio\jbr\bin\keytool.exe`.
 You will be asked for a keystore password, a key password and some identity fields — the identity
 fields are not shown to users, so anything sane is fine.
 
-**Store `drift-upload.jks` and both passwords somewhere you will still have them in five years, and
+**Store `quietloom-upload.jks` and both passwords somewhere you will still have them in five years, and
 never commit the file to source control.** Because Play App Signing holds the real distribution key
 on Google's side, a lost *upload* key can be reset by contacting Google, but it is a slow and
 irritating process. Back it up now.
@@ -458,9 +458,9 @@ irritating process. Back it up now.
 Create `android/keystore.properties` (add it to `.gitignore` alongside the `.jks`):
 
 ```properties
-storeFile=C:/secure/drift-upload.jks
+storeFile=C:/secure/quietloom-upload.jks
 storePassword=…
-keyAlias=drift-upload
+keyAlias=quietloom-upload
 keyPassword=…
 ```
 
@@ -520,7 +520,7 @@ anyone is asking for it. It is the lowest-value item on this list and the fiddli
    npx cap sync android
    ```
 2. In Play Console, go to *Monetize → Products → In-app products → Create product*. Product ID
-   **`drift_premium_forever`** (this string must match exactly — it is `Billing.PRODUCT_ID` in the
+   **`quietloom_premium_forever`** (this string must match exactly — it is `Billing.PRODUCT_ID` in the
    code), type **managed product** (one-time, not a subscription), price **$4.99**, then **activate
    it**. Note that Play will not let you create in-app products until you have uploaded a build to
    some track, so step 10 comes first.
@@ -540,7 +540,7 @@ anyone is asking for it. It is the lowest-value item on this list and the fiddli
 
    | Member | Contract |
    |---|---|
-   | `PRODUCT_ID` | `'drift_premium_forever'`. Must match the Play Console product ID exactly. |
+   | `PRODUCT_ID` | `'quietloom_premium_forever'`. Must match the Play Console product ID exactly. |
    | `PRICE_DISPLAY` | Display string. Replace at runtime with the store's localised price. |
    | `init()` | `async`, must never throw. Called once at boot from `src/main.js`. |
    | `isAvailable()` | Synchronous boolean, currently `store !== null`. While `false` the paywall shows "Coming soon — the free unlock works tonight" instead of a dead button. |
@@ -555,10 +555,10 @@ anyone is asking for it. It is the lowest-value item on this list and the fiddli
    every layer and — via `Ads.setAdsDisabled(true)` — kills all advertising for that user.
 
 5. **[CRITICAL] Delete the dev backdoor before any public release.** `src/services/billing.js` ends
-   with a `__grantPremiumForTesting()` method and a `window.__drift.grantPremium()` handle, added so
+   with a `__grantPremiumForTesting()` method and a `window.__quietloom.grantPremium()` handle, added so
    the premium UI path could be demoed without a Play Console. It is flagged in the source with a
    delete-before-release banner. Anyone who connects Chrome DevTools or `adb` to a shipped build can
-   call `window.__drift.grantPremium(true)` and unlock everything for free, permanently, with no
+   call `window.__quietloom.grantPremium(true)` and unlock everything for free, permanently, with no
    ads. Remove both the method and the `if (typeof window !== 'undefined')` block at the bottom of
    the file. This is on the pre-flight checklist below for a reason.
 
@@ -572,9 +572,9 @@ Google will start suppressing you in search.
 1. `AD_UNITS` in `src/services/ads.js` contains no `3940256099942544`.
 2. `TEST_MODE` in `src/services/ads.js` is `false`.
 3. `AndroidManifest.xml` `APPLICATION_ID` contains no `3940256099942544`, and uses `~` not `/`.
-4. `__grantPremiumForTesting` and the `window.__drift` block are **gone** from
+4. `__grantPremiumForTesting` and the `window.__quietloom` block are **gone** from
    `src/services/billing.js`. Grep the built bundle to be sure:
-   `grep -r "__drift" android/app/src/main/assets/public/` must return nothing.
+   `grep -r "__quietloom" android/app/src/main/assets/public/` must return nothing.
 5. `webContentsDebuggingEnabled` is `false` in `capacitor.config.json`.
 6. `versionCode` in `android/app/build.gradle` has been incremented.
 7. `npm run sync` was run **after** all of the above.
@@ -587,12 +587,12 @@ Google will start suppressing you in search.
 ### App title (30 characters max)
 
 ```
-Drift: Pink Noise & Sleep
+Quietloom: Pink Noise & Sleep
 ```
 
 25 characters. The title is the single heaviest ASO signal on Google Play, so it carries a keyword
-rather than being purely a brand. Alternatives if you prefer: `Drift — Sleep Sounds & Noise` (28) or
-`Drift: Sleep Sounds, No Loop` (28).
+rather than being purely a brand. Alternatives if you prefer: `Quietloom — Sleep Sounds & Noise` (28) or
+`Quietloom: Sleep Sounds, No Loop` (28).
 
 ### Short description (80 characters max)
 
@@ -606,10 +606,10 @@ results. It leads with the two differentiators.
 ### Full description
 
 ```
-Every sound in Drift is generated live on your phone. There are no recordings, so nothing
+Every sound in Quietloom is generated live on your phone. There are no recordings, so nothing
 ever loops — and once you have noticed a loop point in a sleep app, you cannot un-notice it.
 
-Drift is also the only sleep app we know of that cites its sources. Tap the info dot on any
+Quietloom is also the only sleep app we know of that cites its sources. Tap the info dot on any
 sound and you get the actual peer-reviewed study, with an honest badge for how strong the
 evidence really is: Strong, Moderate, or Emerging. We link the research that disagrees with
 us too.
@@ -622,7 +622,7 @@ if you want it — with a card explaining that a systematic review of 38 studies
 evidence for continuous noise as low quality. You should know that.
 
 THE TIMER IS ON BY DEFAULT
-Drift is designed to turn itself off after 45 minutes. The evidence supports sound for
+Quietloom is designed to turn itself off after 45 minutes. The evidence supports sound for
 falling asleep far better than it supports eight hours of noise. Most apps want to run all
 night. We think that is backwards, and the default reflects it.
 
@@ -654,7 +654,7 @@ amber on near-black, with a large clock.
 SAFE VOLUME, INCLUDING A NURSERY CAP
 The WHO recommends keeping continuous bedroom sound below 30 dB. Guidance for infant sound
 machines is stricter still: at or below 50 dB, at least two metres from the crib, never at
-maximum. Drift has a volume guide built in and a nursery-safe cap that hard-limits output.
+maximum. Quietloom has a volume guide built in and a nursery-safe cap that hard-limits output.
 Almost nobody ships this. We think that is strange.
 
 TINY, AND IT WORKS OFFLINE
@@ -668,7 +668,7 @@ video, or permanently with a single purchase. No subscription. No ads in bedside
 ads in the breathing screen, and no ads on any sleep surface, ever.
 
 NOT A MEDICAL DEVICE
-Drift is a relaxation and sound-masking tool. It is not a medical device and it does not
+Quietloom is a relaxation and sound-masking tool. It is not a medical device and it does not
 diagnose, treat, cure or prevent any condition. Sample sizes in this literature are small,
 effects vary a lot between individuals, and we tell you that inside the app. If you have a
 persistent sleep problem, please talk to a doctor.
@@ -721,7 +721,7 @@ searching "brown noise" already knows what they want.
 **Noise colours** — `pink noise`, `brown noise`, `brown noise for sleep`, `pink noise sleep`,
 `noise colors`. This is the sweet spot. Brown noise in particular had a genuine cultural moment and
 searches are large and growing, while the competition is mostly thin single-purpose apps with poor
-ratings. Drift is a better product than nearly all of them and it can *explain why* pink is
+ratings. Quietloom is a better product than nearly all of them and it can *explain why* pink is
 defaulted, which is exactly what someone searching this term wants to know. **This is your primary
 keyword cluster.** It is why the title carries "Pink Noise".
 
@@ -730,7 +730,7 @@ keyword cluster.** It is why the title carries "Pink Noise".
 competition. These people have a specific problem and will read a description.
 
 **Binaural** — `binaural beats`, `binaural beats sleep`, `delta waves`, `0.25 Hz`. A crowded space
-full of nonsense apps, which is exactly the opening: Drift uses the frequencies that were actually
+full of nonsense apps, which is exactly the opening: Quietloom uses the frequencies that were actually
 tested (250 Hz carrier, 0.25 Hz offset, per Fan 2024), badges the layer honestly as *Emerging*, and
 tells you headphones are physically required. Being the credible option in a field of quackery is a
 real position.
@@ -766,7 +766,7 @@ conversion improvement is common and it is worth more than any keyword change yo
 
 ## 6. Launch plan with no marketing budget
 
-You have zero dollars, so the currency is *interestingness*. Fortunately Drift is interesting in
+You have zero dollars, so the currency is *interestingness*. Fortunately Quietloom is interesting in
 three separate ways — the synthesis, the citations, and the contrarian defaults — and each one is a
 different story for a different audience.
 
@@ -828,8 +828,8 @@ for a sleep app and the subreddit is hostile to product links.
 
 ### Hacker News — the best-shaped opportunity you have
 
-This is the one I would put the most effort into, because Drift is unusually HN-shaped. HN
-consistently rewards exactly three things Drift has: something built from first principles rather
+This is the one I would put the most effort into, because Quietloom is unusually HN-shaped. HN
+consistently rewards exactly three things Quietloom has: something built from first principles rather
 than assembled from libraries, intellectual honesty about limitations, and a citation trail.
 
 Post as a **Show HN**:
@@ -1000,7 +1000,7 @@ visitors installing is healthy, and listing experiments improve it) and your **a
 (below 4.0 will suppress you in search, and one early wave of bad reviews is very hard to dig out
 of).
 
-### Two Drift-specific things to keep an eye on
+### Two Quietloom-specific things to keep an eye on
 
 **The grace rule.** `src/ui/paywall.js` deliberately grants the night pass when a rewarded ad
 returns false *and* `Ads.isAvailable()` is false — that is, when the ad system genuinely failed to

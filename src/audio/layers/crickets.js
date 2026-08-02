@@ -15,7 +15,7 @@
  * allocating anything.
  *
  * Insect sound was part of the soundscape that raised HRV and slowed respiration
- * (research.md §3); Drift keeps the chirps sparse and high so they sit above the
+ * (research.md §3); Quietloom keeps the chirps sparse and high so they sit above the
  * masking bed rather than competing with it.
  */
 

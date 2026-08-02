@@ -1,4 +1,4 @@
-# Drift - one command from source to a running app on the emulator.
+# Quietloom - one command from source to a running app on the emulator.
 #
 #   npm run android
 #   .\scripts\build-apk.ps1
@@ -33,7 +33,7 @@ param(
 $ErrorActionPreference = 'Continue'
 $startedAt = Get-Date
 
-$AppId        = 'com.drift.sleepscapes'
+$AppId        = 'com.quietloom.app'
 $LaunchTarget = "$AppId/.MainActivity"
 $ProjectRoot  = Split-Path -Parent $PSScriptRoot
 $AndroidDir   = Join-Path $ProjectRoot 'android'

@@ -1,6 +1,6 @@
-# Drift — The Research Behind Every Sound
+# Quietloom — The Research Behind Every Sound
 
-Drift is built on published sleep and psychophysiology research rather than vibes. This file is the
+Quietloom is built on published sleep and psychophysiology research rather than vibes. This file is the
 complete source list. Every claim below was fetched and read while building the app, and every sound
 in the app links back to an entry here through `src/data/evidence.js`.
 
@@ -38,10 +38,10 @@ improvement in word recall was significantly greater with stimulation.
 Extension of the same protocol to adults with mild cognitive impairment.
 <https://onlinelibrary.wiley.com/doi/full/10.1002/acn3.796>
 
-> **How Drift uses this.** Pink noise is our default noise bed rather than white — most apps ship white
+> **How Quietloom uses this.** Pink noise is our default noise bed rather than white — most apps ship white
 > by default, which the literature does not support as well. The **Deep Pulse** mode reproduces the
 > Papalambros *stimulation pattern* (≈0.8 Hz pink-noise pulses, five ON then an equal OFF interval)
-> open-loop. Drift has no EEG, so it cannot phase-lock to your actual slow oscillations. It is labelled
+> open-loop. Quietloom has no EEG, so it cannot phase-lock to your actual slow oscillations. It is labelled
 > **Experimental** in the app for exactly that reason.
 
 ---
@@ -69,10 +69,10 @@ sleep is **very low**, which the authors explicitly contrast with how widespread
 deep sleep.**
 <https://www.mcgill.ca/oss/article/critical-thinking-health-and-nutrition-technology/white-noise-may-worsen-sleep>
 
-> **How Drift uses this.** Honesty is a feature. Noise beds are badged **Moderate**, not Strong, and the
+> **How Quietloom uses this.** Honesty is a feature. Noise beds are badged **Moderate**, not Strong, and the
 > app links to the negative review as well as the positive trial. It is also why the **sleep timer
 > defaults to ON at 45 minutes**: the evidence supports sound as a sleep-onset aid far better than it
-> supports blasting noise at yourself for eight hours. Drift is designed to turn itself off.
+> supports blasting noise at yourself for eight hours. Quietloom is designed to turn itself off.
 
 ---
 
@@ -98,7 +98,7 @@ insects, wind, thunder, rain, campfire) versus a coffee-shop reference produced 
 *Stress.* 2024.**
 <https://www.tandfonline.com/doi/full/10.1080/10253890.2024.2402519>
 
-> **How Drift uses this.** The nature layers are the core of the library, not decoration, and the
+> **How Quietloom uses this.** The nature layers are the core of the library, not decoration, and the
 > presets deliberately combine the same element families used in the crossover study rather than
 > arbitrary pairings.
 
@@ -113,7 +113,7 @@ n = 226 across three studies, randomised crossover. Blood pressure **rose** in t
 exposure and was stronger in people scoring higher on absorption.
 <https://pmc.ncbi.nlm.nih.gov/articles/PMC10429110/>
 
-> **How Drift uses this.** The single most interesting detail in that study is that silent fire did not
+> **How Quietloom uses this.** The single most interesting detail in that study is that silent fire did not
 > work — the sound is doing the work. So campfire is a first-class synthesised layer with its own ember
 > scene, and the app nudges toward longer sessions because the effect was duration-dependent.
 
@@ -142,7 +142,7 @@ auditory stimulation using delta binaural beat for a better sleep and post-sleep
 sample sizes are small, and the effect is physically impossible without stereo separation — **headphones
 are required**. Overview: <https://www.sleepfoundation.org/noise-and-sleep/binaural-beats>
 
-> **How Drift uses this.** Our binaural presets use the exact parameters that were actually tested
+> **How Quietloom uses this.** Our binaural presets use the exact parameters that were actually tested
 > (0.25 Hz on a 250 Hz carrier; 1–4 Hz delta) instead of invented numbers, the layer is badged
 > **Emerging**, and the app refuses to pretend it works on a phone speaker.
 
@@ -179,7 +179,7 @@ minute.
 *Scientific Reports.* 2020.**
 <https://www.nature.com/articles/s41598-020-64218-7>
 
-> **How Drift uses this.** The breathing pacer defaults to **6 breaths per minute** (badged Strong),
+> **How Quietloom uses this.** The breathing pacer defaults to **6 breaths per minute** (badged Strong),
 > with 4-7-8 offered as a secondary option (badged Emerging) rather than the other way round. And the
 > ocean layer's swell period is locked to **10 seconds — exactly 0.1 Hz** — so the waves themselves are
 > a breathing pacer you can follow without opening a separate screen.
@@ -198,8 +198,8 @@ plus frequency-selective resonance.
 Background on 1/f fluctuation and perceived comfort in natural sound:
 <https://amix-design.com/tl/en/tool-chill/column/science-of-1f-fluctuation.html>
 
-> **How Drift uses this.** Every layer in the engine is multiplied by a slow **1/f amplitude envelope**.
-> This is the difference between "a noise generator" and "rain." It is also why Drift ships zero audio
+> **How Quietloom uses this.** Every layer in the engine is multiplied by a slow **1/f amplitude envelope**.
+> This is the difference between "a noise generator" and "rain." It is also why Quietloom ships zero audio
 > files: a recording loops, and once you notice the loop point you cannot un-notice it. Synthesis with
 > a 1/f envelope never repeats.
 
@@ -220,7 +220,7 @@ from an infant's sleep space and never at maximum volume.
 <https://getsnooz.com/blogs/snoozweek/safe-decibel-levels-for-infants> ·
 <https://parentdata.org/babies/white-noise-developmental-delays/>
 
-> **How Drift uses this.** There is a volume guide built into the app, a warning when the master volume
+> **How Quietloom uses this.** There is a volume guide built into the app, a warning when the master volume
 > goes high, and a **Nursery-safe cap** that hard-limits output for anyone using this near a baby. Note
 > the tension we are honest about: Messineo's positive result used 46 dB, which is *above* the WHO
 > continuous-noise recommendation. That is precisely why the timer defaults on — mask the noisy part of
@@ -240,7 +240,7 @@ After two hours, blue light held melatonin suppressed at 7.5 pg/mL while red lig
 26.0 pg/mL.
 <https://pmc.ncbi.nlm.nih.gov/articles/PMC12113466/>
 
-> **How Drift uses this.** Bedside mode is deep red and amber on near-black, not white-on-black like
+> **How Quietloom uses this.** Bedside mode is deep red and amber on near-black, not white-on-black like
 > every other clock app. If the app is going to be the last thing you look at, it should be the least
 > disruptive thing you look at.
 
@@ -248,7 +248,7 @@ After two hours, blue light held melatonin suppressed at 7.5 pg/mL while red lig
 
 ## Disclaimer
 
-Drift is a relaxation and sound-masking tool. It is **not a medical device**. Sample sizes across this
+Quietloom is a relaxation and sound-masking tool. It is **not a medical device**. Sample sizes across this
 literature are small, effects vary a great deal between individuals, and the pooled evidence for
 continuous noise as a sleep aid is rated low quality by the most rigorous review available. Nothing in
 this app diagnoses, treats, or cures insomnia or any other condition. If you have a persistent sleep

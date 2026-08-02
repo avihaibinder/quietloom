@@ -3,7 +3,7 @@
  *
  * Default is 45 minutes, ON. That is a research decision, not a UX one:
  * the evidence supports sound as a sleep-onset aid far better than it supports
- * running noise at yourself all night (research.md §2). Drift is designed to
+ * running noise at yourself all night (research.md §2). Quietloom is designed to
  * turn itself off.
  */
 
@@ -215,7 +215,7 @@ function render() {
     el(
       'p',
       'why-text',
-      'Why it defaults to on: sound helps you fall asleep, quiet helps you stay asleep. The trial that cut sleep-onset latency by 38% used 46 dB — above the WHO overnight guideline. So Drift masks the noisy part of the evening and then gets out of the way.',
+      'Why it defaults to on: sound helps you fall asleep, quiet helps you stay asleep. The trial that cut sleep-onset latency by 38% used 46 dB — above the WHO overnight guideline. So Quietloom masks the noisy part of the evening and then gets out of the way.',
     ),
   );
   const link = el('button', 'link-btn', 'Read the evidence');
@@ -226,7 +226,7 @@ function render() {
       badge: 'Moderate',
       claim: 'Sound helps you fall asleep. Quiet helps you stay asleep.',
       detail:
-        'Broadband sound at 46 dB produced a median 38% reduction in sleep-onset latency versus a 40 dB ambient baseline in a model of transient insomnia.\n\nA systematic review of 38 articles rated the overall evidence that continuous noise improves sleep as very low, and some work suggests continuous noise may shorten deep sleep. The WHO recommends staying below 30 dB(A) of continuous sound in a bedroom overnight.\n\nBoth results can be true. Drift resolves the tension by fading itself out after 45 minutes rather than running all night.',
+        'Broadband sound at 46 dB produced a median 38% reduction in sleep-onset latency versus a 40 dB ambient baseline in a model of transient insomnia.\n\nA systematic review of 38 articles rated the overall evidence that continuous noise improves sleep as very low, and some work suggests continuous noise may shorten deep sleep. The WHO recommends staying below 30 dB(A) of continuous sound in a bedroom overnight.\n\nBoth results can be true. Quietloom resolves the tension by fading itself out after 45 minutes rather than running all night.',
       sources: [
         { label: 'Messineo 2017, Front Neurol', url: 'https://pmc.ncbi.nlm.nih.gov/articles/PMC5742584/' },
         { label: 'Riedy 2021, Sleep Medicine Reviews', url: 'https://www.sciencedirect.com/science/article/abs/pii/S1087079220301283' },

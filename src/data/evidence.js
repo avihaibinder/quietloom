@@ -1,5 +1,5 @@
 /**
- * The evidence metadata behind every sound. This is Drift's differentiator:
+ * The evidence metadata behind every sound. This is Quietloom's differentiator:
  * tap the info dot on any layer and you get the actual study, not marketing copy.
  * Mirrors research.md — keep the two in sync.
  */
@@ -28,7 +28,7 @@ export const EVIDENCE = {
     badge: BADGE.MODERATE,
     claim: 'Low, slow rumbles add masking energy exactly where traffic and voices sit.',
     detail:
-      'Thunder was one of the elements in the nature soundscape that produced a measurable parasympathetic shift. Drift keeps it distant and infrequent — sudden events above about 45 dB can cause micro-arousals.',
+      'Thunder was one of the elements in the nature soundscape that produced a measurable parasympathetic shift. Quietloom keeps it distant and infrequent — sudden events above about 45 dB can cause micro-arousals.',
     sources: [
       { label: 'Kumpulainen 2025, Psychophysiology', url: 'https://pmc.ncbi.nlm.nih.gov/articles/PMC11726612/' },
       { label: 'WHO Night Noise Guidelines 2009', url: 'https://www.who.int/europe/news-room/fact-sheets/item/noise' },
@@ -71,7 +71,7 @@ export const EVIDENCE = {
     badge: BADGE.MODERATE,
     claim: 'Insect sound was part of the soundscape that raised HRV and slowed breathing.',
     detail:
-      'Included in the nature-based soundscape that produced significantly higher RMSSD and lower respiratory rate versus a matched reference recording. Drift keeps the chirps sparse and high so they sit above the masking bed rather than competing with it.',
+      'Included in the nature-based soundscape that produced significantly higher RMSSD and lower respiratory rate versus a matched reference recording. Quietloom keeps the chirps sparse and high so they sit above the masking bed rather than competing with it.',
     sources: [
       { label: 'Kumpulainen 2025, Psychophysiology', url: 'https://pmc.ncbi.nlm.nih.gov/articles/PMC11726612/' },
     ],
@@ -79,7 +79,7 @@ export const EVIDENCE = {
   pink: {
     title: 'Pink Noise',
     badge: BADGE.STRONG,
-    claim: 'The noise with the best evidence — and the reason Drift defaults to pink, not white.',
+    claim: 'The noise with the best evidence — and the reason Quietloom defaults to pink, not white.',
     detail:
       'Steady pink noise reduced EEG complexity and significantly increased the percentage of stable sleep time in a 40-person study. Its 1/f spectrum is the same slope found throughout natural sound.',
     sources: [
@@ -125,7 +125,7 @@ export const EVIDENCE = {
     badge: BADGE.EMERGING,
     claim: 'Rhythmic pink-noise pulses modelled on a slow-wave enhancement protocol. Experimental.',
     detail:
-      'In older adults, pink-noise pulses delivered in blocks of five, phase-locked to the up-state of slow oscillations, increased slow-wave and spindle activity and improved next-morning word recall. Drift has no EEG, so it runs the same pulse pattern open-loop at about 0.8 Hz — the rhythm without the phase-locking. It is an approximation of the protocol, not the protocol.',
+      'In older adults, pink-noise pulses delivered in blocks of five, phase-locked to the up-state of slow oscillations, increased slow-wave and spindle activity and improved next-morning word recall. Quietloom has no EEG, so it runs the same pulse pattern open-loop at about 0.8 Hz — the rhythm without the phase-locking. It is an approximation of the protocol, not the protocol.',
     sources: [
       { label: 'Papalambros 2017, Front Hum Neurosci', url: 'https://pmc.ncbi.nlm.nih.gov/articles/PMC5340797/' },
       { label: 'Papalambros 2019, Ann Clin Transl Neurol', url: 'https://onlinelibrary.wiley.com/doi/full/10.1002/acn3.796' },
@@ -159,7 +159,7 @@ export const BREATH_EVIDENCE = {
 export const VOLUME_EVIDENCE = {
   title: 'How loud should this be?',
   detail:
-    'The WHO recommends below 30 dB(A) of continuous sound inside a bedroom, and notes that single events above about 45 dB can cause micro-arousals. The trial that cut sleep-onset latency by 38% used 46 dB. Both can be true: sound helps you fall asleep, then quiet helps you stay asleep — which is why Drift defaults to fading out after 45 minutes.\n\nFor infants, guidance is stricter: keep a sound machine at or below 50 dB, at least 2 metres from the crib, never at maximum. Drift’s Nursery-safe cap enforces a hard ceiling for this.',
+    'The WHO recommends below 30 dB(A) of continuous sound inside a bedroom, and notes that single events above about 45 dB can cause micro-arousals. The trial that cut sleep-onset latency by 38% used 46 dB. Both can be true: sound helps you fall asleep, then quiet helps you stay asleep — which is why Quietloom defaults to fading out after 45 minutes.\n\nFor infants, guidance is stricter: keep a sound machine at or below 50 dB, at least 2 metres from the crib, never at maximum. Quietloom’s Nursery-safe cap enforces a hard ceiling for this.',
   sources: [
     { label: 'WHO Night Noise Guidelines for Europe (2009)', url: 'https://www.polisnetwork.eu/wp-content/uploads/2019/06/who-night-noise-guidelines.pdf' },
     { label: 'Messineo 2017, Front Neurol', url: 'https://pmc.ncbi.nlm.nih.gov/articles/PMC5742584/' },

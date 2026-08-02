@@ -1,8 +1,8 @@
-# Privacy Policy — Drift: Living Sleepscapes
+# Privacy Policy — Quietloom: Living Sleepscapes
 
 **Last updated: [DATE]**
 
-Drift ("the app") is published by **[YOUR NAME]**. This policy explains what the app does and does
+Quietloom ("the app") is published by **[YOUR NAME]**. This policy explains what the app does and does
 not do with information. It is written to be read, not to be survived.
 
 The short version: **we do not have a server, we do not have your data, and there is nothing to log
@@ -13,7 +13,7 @@ detail below.
 
 ## 1. No account, no sign-in
 
-Drift has no user accounts, no registration, no login, no email capture and no social sign-in. You
+Quietloom has no user accounts, no registration, no login, no email capture and no social sign-in. You
 never tell the app your name, email address, phone number, date of birth or location, because there
 is nowhere in the app to enter them.
 
@@ -41,20 +41,20 @@ Google's terms, not ours.
 We operate no servers, no accounts database, no crash-reporting service and **no analytics SDK of
 any kind**. There is no Firebase Analytics, no Google Analytics, no Amplitude, no Mixpanel, no
 Facebook SDK and no attribution or install-tracking SDK in this app. We do not know how many times
-you opened Drift, which sounds you chose, or how long you slept.
+you opened Quietloom, which sounds you chose, or how long you slept.
 
 ## 4. Audio and the microphone
 
-**Drift never records audio and never listens to you.** The app has no microphone permission at
+**Quietloom never records audio and never listens to you.** The app has no microphone permission at
 all — you can verify this yourself on the app's page in Google Play, under "App permissions".
 Because the permission is absent, the app is technically incapable of accessing the microphone.
 
-Every sound Drift plays is generated mathematically on your device, in real time, using the Web Audio
+Every sound Quietloom plays is generated mathematically on your device, in real time, using the Web Audio
 API. The app contains no audio recordings, and it does not download, stream or upload any audio.
 
 ## 5. Advertising — the one place data is involved
 
-Drift is free, and the free version is supported by ads served by **Google AdMob**. To serve those
+Quietloom is free, and the free version is supported by ads served by **Google AdMob**. To serve those
 ads, Google's advertising SDK — not us — may collect and process information including:
 
 - your device's **advertising identifier** (Android Advertising ID)
@@ -111,14 +111,14 @@ permission and no storage permission.
 
 ## 8. Children
 
-Drift is designed for adults and is **not directed at children**. It is not enrolled in Google
+Quietloom is designed for adults and is **not directed at children**. It is not enrolled in Google
 Play's Designed for Families programme, and its content rating and target-audience declaration in
 Google Play reflect an adult audience.
 
-We are aware that parents use sound apps near sleeping infants, and Drift includes a "nursery-safe"
+We are aware that parents use sound apps near sleeping infants, and Quietloom includes a "nursery-safe"
 volume cap for exactly that reason, based on World Health Organization night-noise guidance and
 American Academy of Pediatrics guidance on sound machines. That feature is for a parent operating
-the phone — it does not make Drift a children's app, and a child is not the intended user.
+the phone — it does not make Quietloom a children's app, and a child is not the intended user.
 
 We do not knowingly collect any personal information from children. We collect no personal
 information from anyone. Ad content is limited to Google's **"General"** maximum content rating, so
@@ -136,7 +136,7 @@ payment processor, as described above.
 ## 10. Data retention and deletion
 
 Because all app data lives on your device, you delete it by clearing the app's storage
-(**Settings → Apps → Drift → Storage → Clear data**) or by uninstalling the app. There is no
+(**Settings → Apps → Quietloom → Storage → Clear data**) or by uninstalling the app. There is no
 account to close and no deletion request to submit to us. For data held by Google in connection with
 advertising, use the Google controls linked in section 5, or Google's privacy tools at
 <https://myaccount.google.com/data-and-privacy>.
@@ -162,7 +162,7 @@ updated" date. Material changes will also be noted in the app's release notes on
 
 ## 14. Contact
 
-Questions about this policy, or about privacy in Drift generally:
+Questions about this policy, or about privacy in Quietloom generally:
 
 **[YOUR NAME]**
 **[YOUR EMAIL]**
@@ -171,7 +171,7 @@ Questions about this policy, or about privacy in Drift generally:
 
 ## Not a medical device
 
-Drift is a relaxation and sound-masking tool. It is not a medical device, it does not diagnose,
+Quietloom is a relaxation and sound-masking tool. It is not a medical device, it does not diagnose,
 treat, cure or prevent any condition, and nothing in the app is medical advice. If you have a
 persistent sleep problem, please talk to a doctor.
 
@@ -185,7 +185,7 @@ persistent sleep problem, please talk to a doctor.
 >
 > Cheapest workable options, all free:
 > 1. **GitHub Pages** — put this file in a public repo as `index.md`, enable Pages, use the resulting
->    `https://<you>.github.io/drift-privacy/` URL. Same host can serve `app-ads.txt`.
+>    `https://<you>.github.io/quietloom-privacy/` URL. Same host can serve `app-ads.txt`.
 > 2. A single static page on Netlify, Cloudflare Pages or Vercel.
 > 3. A public Notion or Google Sites page, if you want zero tooling.
 >

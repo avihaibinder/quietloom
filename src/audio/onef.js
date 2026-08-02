@@ -7,7 +7,7 @@
  * multiplied by a GainNode whose gain is driven by a sum of very low frequency
  * modulators at roughly octave-spaced rates, with amplitude proportional to 1/f.
  * The slow components dominate, which is exactly what "organic" sounds like: a
- * long, unhurried drift with a little fine texture on top.
+ * long, unhurried quietloom with a little fine texture on top.
  *
  * Everything here runs as OscillatorNodes routed into an AudioParam, i.e. wholly
  * on the audio thread. Android can throttle our JS timers to nothing and the

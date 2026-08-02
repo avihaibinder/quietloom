@@ -1,5 +1,5 @@
 /**
- * AdMob integration — Drift / Sleepscapes.
+ * AdMob integration — Quietloom / Sleepscapes.
  *
  * FROZEN CONTRACT. Every method below is called by the UI layer and MUST be
  * safe to call anywhere, including a desktop browser with no Capacitor at all.

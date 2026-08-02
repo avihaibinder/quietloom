@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">Drift</string>
-    <string name="title_activity_main">Drift</string>
-    <string name="package_name">com.drift.sleepscapes</string>
-    <string name="custom_url_scheme">com.drift.sleepscapes</string>
+    <string name="app_name">Quietloom</string>
+    <string name="title_activity_main">Quietloom</string>
+    <string name="package_name">com.quietloom.app</string>
+    <string name="custom_url_scheme">com.quietloom.app</string>
 </resources>

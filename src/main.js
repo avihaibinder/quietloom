@@ -166,7 +166,7 @@ async function boot() {
   // an actual device.
   setTimeout(() => {
     console.info(
-      `[drift] ready — native=${Native.isNative()} premium=${Entitlements.isPremium()} pass=${Entitlements.hasNightPass()}`,
+      `[quietloom] ready — native=${Native.isNative()} premium=${Entitlements.isPremium()} pass=${Entitlements.hasNightPass()}`,
     );
   }, 0);
 }

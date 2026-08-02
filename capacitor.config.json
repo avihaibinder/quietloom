@@ -1,6 +1,6 @@
 {
-  "appId": "com.drift.sleepscapes",
-  "appName": "Drift",
+  "appId": "com.quietloom.app",
+  "appName": "Quietloom",
   "webDir": "dist",
   "backgroundColor": "#05070c",
   "android": {

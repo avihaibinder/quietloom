@@ -1,9 +1,9 @@
 {
-  "name": "drift-sleepscapes",
+  "name": "quietloom",
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Drift — Living Sleepscapes. Generative, research-backed sleep sounds.",
+  "description": "Quietloom — Living Sleepscapes. Generative, research-backed sleep sounds.",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
