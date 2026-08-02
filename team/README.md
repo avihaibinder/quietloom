@@ -36,16 +36,25 @@ would generate coordination rather than throughput.
 ```
 founder
 └── CEO
-    ├── Software Team Lead ─── Audio Engineer
-    │                       ├─ Senior Frontend ⋯ Junior Frontend
-    │                       └─ Senior Platform ⋯ Junior Platform
-    ├── Product Designer       (no reports; specs go via the Team Lead)
-    ├── Research Lead          (no reports; veto on any user-facing claim)
-    ├── Growth Lead            (no reports)
-    └── QA & Verification      (no reports; can block a release)
-
-    ─── assigns work        ⋯ technical direction only
+    │
+    ├── Software Team Lead              assigns and reviews all engineering
+    │   │
+    │   ├── Audio Engineer                          (single role)
+    │   │
+    │   ├── Senior Frontend Engineer
+    │   │   └╌╌ Junior Frontend Engineer            technical direction only
+    │   │
+    │   └── Senior Platform Engineer
+    │       └╌╌ Junior Platform Engineer            technical direction only
+    │
+    ├── Product Designer                (no reports; specs go via the Team Lead)
+    ├── Research Lead                   (no reports; veto on any user-facing claim)
+    ├── Growth Lead                     (no reports)
+    └── QA & Verification               (no reports; can block a release)
 ```
+
+Both juniors sit under the Team Lead for task assignment — the dotted line to their
+senior is technical direction, not a second queue of work.
 
 **All engineering work routes through the Team Lead.** They read every incoming task,
 size it small or big, and give it to the matching seniority level. The CEO does not
