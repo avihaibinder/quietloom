@@ -15,6 +15,7 @@ import { Animated, AppState, Pressable, StyleSheet, Text, View } from 'react-nat
 
 import { engine } from '../../audio/engine';
 import { bus } from '../../core/bus';
+import { createFrameClock } from '../../core/frameClock';
 import { BREATH_EVIDENCE } from '../../data/evidence';
 import type { Badge, EngineState } from '../../types';
 import { BadgeChip } from '../components/controls';
@@ -26,7 +27,15 @@ import { openEvidenceData } from '../sheets/EvidenceSheet';
 import { color, radius } from '../theme';
 
 const KEY = 'breathing';
+/** The pacer runs at its own rate, faster than the 24fps scene. */
 const FRAME_MS = 1000 / 30;
+/**
+ * A gap longer than this was a stall. The pacer times its phases off the rAF
+ * timestamp directly rather than off dt, so this clamp is inert here today; it
+ * is passed anyway because a clock that can hand back a five-second dt is a
+ * trap set for whoever next reaches for the return value.
+ */
+const MAX_FRAME_MS = 200;
 const MIN_SCALE = 0.42;
 const SPAN = 0.58; // MIN_SCALE + SPAN = 1
 
@@ -167,9 +176,15 @@ export function BreathingOverlay(): React.JSX.Element | null {
 
   // Loop state that must not trigger renders.
   const raf = useRef(0);
-  /** -1 = "no previous frame yet". See the clock note in `tick`. */
-  const lastFrame = useRef(-1);
-  const acc = useRef(0);
+  /**
+   * The same clock the scene canvas runs on, at the pacer's own rate. One
+   * mounted overlay, one clock — see src/core/frameClock.ts for why this is not
+   * written out longhand here any more.
+   */
+  const clock = useMemo(
+    () => createFrameClock({ frameMs: FRAME_MS, maxFrameMs: MAX_FRAME_MS }),
+    [],
+  );
   /** -1 = "seed me from the next frame's clock". See the note in `tick`. */
   const phaseStart = useRef(-1);
   const phaseIdx = useRef(0);
@@ -207,20 +222,13 @@ export function BreathingOverlay(): React.JSX.Element | null {
   const tick = useCallback(
     (now: number) => {
       raf.current = requestAnimationFrame(tick);
-      // NOT Date.now(). requestAnimationFrame hands `tick` performance.now() —
-      // milliseconds since the app STARTED, not since 1970 — so seeding these
-      // clocks with the wall clock made the first dt about -1.79e12 ms. The
-      // accumulator went that far negative and could never climb back to a
-      // frame boundary at ~16 ms a frame, so the loop ran forever without ever
-      // advancing: the circle sat frozen at MIN_SCALE reading "Ready", and no
-      // user has ever seen the pacer move. Identical bug, identical fix, as
-      // src/scenes/SceneView.tsx:76-89. -1 is "no previous frame" — the first
-      // callback of a loop has nothing to measure against.
-      const dt = lastFrame.current < 0 ? 0 : now - lastFrame.current;
-      lastFrame.current = now;
-      acc.current += dt;
-      if (acc.current < FRAME_MS) return;
-      acc.current = 0;
+      // The pacer uses the clock purely as a gate: null means this frame falls
+      // inside the cap. Everything below times its phases off `now` itself, so
+      // the returned dt is deliberately unused — but `now` still goes to the
+      // clock unexamined, and nothing here decides what "the previous frame"
+      // was. That used to be written out longhand in this file AND in
+      // SceneView, which is exactly how the same clock bug shipped twice.
+      if (clock.step(now) === null) return;
 
       const available = oceanRef.current;
 
@@ -261,7 +269,7 @@ export function BreathingOverlay(): React.JSX.Element | null {
       else scaleAnim.setValue(1);
       showLabel(phase.label);
     },
-    [scaleAnim, showLabel],
+    [clock, scaleAnim, showLabel],
   );
 
   const stopLoop = useCallback(() => {
@@ -271,13 +279,13 @@ export function BreathingOverlay(): React.JSX.Element | null {
 
   const startLoop = useCallback(() => {
     if (raf.current) return;
-    // -1, not Date.now() — see the clock note in `tick`.
-    lastFrame.current = -1;
-    // Prime the accumulator so the first frame advances immediately.
-    acc.current = FRAME_MS;
+    // Discards however far the clock ran while the loop was cancelled, and
+    // primes it so the first frame advances immediately. No timestamp is passed
+    // and none can be — see src/core/frameClock.ts.
+    clock.reset();
     if (!syncedRef.current) phaseStart.current = -1;
     raf.current = requestAnimationFrame(tick);
-  }, [tick]);
+  }, [clock, tick]);
 
   useEffect(() => {
     if (!open) {
