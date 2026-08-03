@@ -70,4 +70,40 @@ foreach ($cert in $found) {
 
 Write-Host ''
 Write-Host "Truststore ready: $Store"
-Write-Host 'android/gradle.properties already points at it.'
+
+# Point Gradle at the store, and actually check rather than assume.
+#
+# This used to just print "android/gradle.properties already points at it",
+# which was true under Capacitor where android/ was committed and configured
+# once. Under Expo the directory is generated: every `expo prebuild` writes a
+# fresh gradle.properties with no truststore lines in it, so the claim was
+# wrong every time - and wrong in the worst direction, reporting success while
+# leaving the build broken with a PKIX error.
+
+$props = Join-Path $PSScriptRoot '..\android\gradle.properties'
+
+if (-not (Test-Path $props)) {
+    Write-Host ''
+    Write-Host 'android/gradle.properties does not exist yet - run `npx expo prebuild`'
+    Write-Host 'first, then re-run this script to wire the truststore in.'
+    return
+}
+
+if (Select-String -Path $props -Pattern 'javax\.net\.ssl\.trustStore' -Quiet) {
+    Write-Host 'android/gradle.properties already points at it.'
+    return
+}
+
+$storeFull = (Resolve-Path $Store).Path.Replace('\', '/')
+$block = @"
+
+# Added by scripts/fix-truststore.ps1. Norton (and most TLS-inspecting AV or
+# proxies) re-sign HTTPS with their own root, which the JDK's separate CA store
+# does not trust, so every Gradle dependency fetch dies with a PKIX error.
+# NOTE: android/ is generated - re-run this script after every expo prebuild.
+systemProp.javax.net.ssl.trustStore=$storeFull
+systemProp.javax.net.ssl.trustStorePassword=changeit
+"@
+
+Add-Content -Path $props -Value $block -Encoding utf8
+Write-Host 'Wired the truststore into android/gradle.properties.'

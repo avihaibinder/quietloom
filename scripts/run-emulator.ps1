@@ -12,7 +12,8 @@
 [CmdletBinding()]
 param(
     [string] $Avd = 'Pixel_9a',
-    [int]    $TimeoutSec = 300
+    [int]    $TimeoutSec = 300,
+    [switch] $NoBootAnim
 )
 
 # NOT 'Stop': adb writes routine chatter ("device offline", daemon start-up) to
@@ -66,9 +67,22 @@ if (-not $serial) {
         throw "Create '$Avd' in Android Studio's Device Manager (must include the Play Store image)."
     }
 
-    Write-Host "Starting emulator '$Avd'..."
+    # -no-snapshot-load forces a cold boot.
+    #
+    # A saved snapshot can rot: the emulator then comes up, registers with adb
+    # as 'offline', and sits there burning almost no CPU until this script's
+    # timeout expires. It looks exactly like a slow machine, which sends you
+    # hunting for CPU contention that is not there. Observed on Pixel_9a, where
+    # a cold boot instead reached sys.boot_completed in about 80 seconds.
+    #
+    # Cold boot costs roughly a minute over a good snapshot restore. Paying it
+    # every time is worth not debugging this again.
+    $emuArgs = @('-avd', $Avd, '-netdelay', 'none', '-netspeed', 'full', '-no-snapshot-load')
+    if ($NoBootAnim) { $emuArgs += '-no-boot-anim' }
+
+    Write-Host "Starting emulator '$Avd' (cold boot)..."
     Start-Process -FilePath $emulator `
-                  -ArgumentList @('-avd', $Avd, '-netdelay', 'none', '-netspeed', 'full') `
+                  -ArgumentList $emuArgs `
                   -WindowStyle Minimized | Out-Null
 } else {
     Write-Host "Device $serial attached but still booting..."
