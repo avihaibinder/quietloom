@@ -177,6 +177,54 @@ export function getGrainBuffer(ctx: BaseAudioContext): AudioBuffer {
  *
  * react-native-audio-api spells the handler `onEnded` (not `onended`); it is a
  * settable callback that also accepts null, which is exactly what dispose needs.
+ *
+ * UNSUBSCRIBING — why `onEnded = null` is the real removal, not a cosmetic one
+ * ---------------------------------------------------------------------------
+ * Setting `onEnded = fn` registers a handler in a NATIVE registry that outlives
+ * the event. Read from the installed 0.13.2 source:
+ *
+ *   AudioScheduledSourceNode.ts:50-61   the setter calls
+ *     audioEventEmitter.addAudioEventListener('ended', cb) and then THROWS AWAY
+ *     the AudioEventSubscription it gets back, writing only its id to the
+ *     native node. So there is no subscription object left in JS to hold.
+ *   AudioEventHandlerRegistry.cpp:106   handleEventOnJSThread invokes the
+ *     handler and never erases it. Firing does not unregister.
+ *
+ * So every one-shot voice used to leave a shared_ptr<jsi::Function> in that
+ * registry forever, and that function closes over `source`, `nodes` and
+ * `voice` — which retains the JS wrappers, which retains the host object, whose
+ * destructor is the only other thing that would have unregistered it. A closed
+ * JS<->native retain cycle, roughly 52,000 of them an hour on the default
+ * preset. Dispatch stays O(1), so it never showed up as slowness; it showed up
+ * as Hermes heap growth and rising GC pressure across a night.
+ *
+ * The library exposes no public handle to that subscription (AudioEventEmitter
+ * is not exported; the node's own emitter and `node` are protected). But
+ * `onEnded = null` is NOT merely cosmetic — it reaches the same C++
+ * unregisterHandler that AudioEventSubscription.remove() would:
+ *
+ *   onEnded = null
+ *     -> node.onEnded = '0'                     AudioScheduledSourceNode.ts:52
+ *     -> assignOnEndedCallbackId(0)             ...HostObject.cpp:26
+ *     -> EventCaller::assignCallbackId(0)       EventCaller.hpp:34
+ *          previousCallbackId != 0, so it calls
+ *        unregisterCallback(previousCallbackId)
+ *     -> registry.unregisterHandler(ENDED, id)  AudioEventHandlerRegistry.cpp:68
+ *          eventHandlers_[ENDED].erase(id)      — the shared_ptr is dropped
+ *
+ * Which is byte-for-byte what removeAudioEventListener('ended', id) does
+ * (AudioEventHandlerRegistryHostObject.cpp:27-34). Both call the same method
+ * on the same registry.
+ *
+ * dispose() therefore already unregistered correctly. The leak was entirely on
+ * the NORMAL path — a voice that simply ends — which is essentially all of
+ * them. So the handler now unregisters itself as its last act. Re-entering the
+ * registry from inside a dispatch is explicitly supported: handleEventOnJSThread
+ * copies the matching handlers out, releases the mutex, and only then calls into
+ * JS, precisely so a handler may register/unregister (see its comment at :111).
+ *
+ * Cost of the fix: one extra JSI property write per voice, paid at end-of-life
+ * and spread over time, in exchange for a bounded heap. Worth it.
  */
 export interface VoicePool {
   track(source: AudioScheduledSourceNode, ...nodes: AudioNode[]): void;
@@ -198,6 +246,11 @@ export function createVoicePool(): VoicePool {
         live.delete(voice);
         source.disconnect();
         for (const n of nodes) n.disconnect();
+        // Last act: drop the native handler registration, which is the only
+        // thing still retaining this closure (and through it the source and its
+        // gain wrappers). See the block comment above — this is the same
+        // registry erase that a held subscription's remove() would perform.
+        source.onEnded = null;
       };
     },
     get size(): number {

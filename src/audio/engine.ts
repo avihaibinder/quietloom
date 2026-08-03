@@ -44,7 +44,7 @@ import type { AudioParam } from 'react-native-audio-api';
 
 import { bus } from '../core/bus';
 import { SOUND_IDS } from '../types';
-import type { EngineState, LayerState, MixSpec, SoundId } from '../types';
+import type { EngineState, LayerParams, LayerState, MixSpec, SoundId } from '../types';
 import { playChime as strikeChime } from './chime';
 import { createBinaural } from './layers/binaural';
 import { createCrickets } from './layers/crickets';
@@ -203,13 +203,29 @@ export class AudioEngine {
   private _nodes: Partial<Record<SoundId, LayerEntry>> = {};
   private _nursery = false;
 
+  /**
+   * getState() cache — see getState() for the invariant that makes it safe.
+   * `null` always means "rebuild this piece". The three levels are invalidated
+   * independently so a volume tick rebuilds three small objects instead of 23.
+   */
+  private _stateCache: EngineState | null = null;
+  private _layersCache: Record<SoundId, LayerState> | null = null;
+  private _layerCache: Record<SoundId, LayerState | null>;
+  private _paramsCache: Record<SoundId, LayerParams | null>;
+
   constructor() {
     const layers = {} as Record<SoundId, LayerState>;
+    const layerCache = {} as Record<SoundId, LayerState | null>;
+    const paramsCache = {} as Record<SoundId, LayerParams | null>;
     for (const id of SOUND_IDS) {
       const d = LAYER_DEFAULTS[id];
       layers[id] = { enabled: false, volume: d.volume, params: { ...d.params } };
+      layerCache[id] = null;
+      paramsCache[id] = null;
     }
     this.layers = layers;
+    this._layerCache = layerCache;
+    this._paramsCache = paramsCache;
 
     // The RN equivalent of the web build's visibilitychange hook: coming back to
     // the foreground is the moment to notice the OS suspended our context.
@@ -231,6 +247,7 @@ export class AudioEngine {
     }
 
     this._running = true;
+    this._dirtyTop();
     this._sched?.start();
 
     const g = this._masterGain?.gain;
@@ -252,6 +269,7 @@ export class AudioEngine {
   async stop(): Promise<void> {
     if (!this._running) return;
     this._running = false;
+    this._dirtyTop();
 
     if (this.ctx && this._masterGain) {
       const now = this.ctx.currentTime;
@@ -285,6 +303,7 @@ export class AudioEngine {
   setLayerEnabled(id: SoundId, on: boolean): void {
     if (!this.layers[id]) return;
     this.layers[id].enabled = !!on;
+    this._dirtyLayer(id);
     this._applyLayer(id);
     bus.emit('mix:changed', this.getState());
   }
@@ -292,6 +311,7 @@ export class AudioEngine {
   setLayerVolume(id: SoundId, v: number): void {
     if (!this.layers[id]) return;
     this.layers[id].volume = clamp01(v);
+    this._dirtyLayer(id);
     const n = this._nodes[id];
     if (n && this.ctx && this.layers[id].enabled) {
       n.gain.gain.setTargetAtTime(this.layers[id].volume * TRIM[id], this.ctx.currentTime, FADE_TC);
@@ -302,6 +322,7 @@ export class AudioEngine {
   setLayerParam(id: SoundId, name: string, value: number): void {
     if (!this.layers[id]) return;
     this.layers[id].params[name] = value;
+    this._dirtyLayerParams(id);
     this._nodes[id]?.layer.setParam?.(name, value);
     bus.emit('mix:changed', this.getState());
   }
@@ -310,6 +331,7 @@ export class AudioEngine {
 
   setMasterVolume(v: number): void {
     this.master = clamp01(v);
+    this._dirtyTop();
     if (this.ctx && this._masterGain && this._running) {
       // Deliberately no cancel: if the sleep timer has a fade to zero already on
       // the audio clock, a volume nudge must not silently disarm it.
@@ -363,13 +385,99 @@ export class AudioEngine {
 
   // -------------------------------------------------------------------- state
 
+  /**
+   * INVALIDATION — every path that mutates observable state calls exactly one of
+   * these three, and they are the ONLY writers of the cache fields.
+   *
+   *   _dirtyTop()          `master` or `running` changed
+   *   _dirtyLayer(id)      that layer's `enabled` or `volume` changed
+   *   _dirtyLayerParams(id) that layer's `params` changed (implies _dirtyLayer)
+   *
+   * Call sites, exhaustively:
+   *   constructor          — caches start null, so nothing to dirty
+   *   start()              _running = true        -> _dirtyTop
+   *   stop()               _running = false       -> _dirtyTop
+   *   setLayerEnabled()    layers[id].enabled     -> _dirtyLayer
+   *   setLayerVolume()     layers[id].volume      -> _dirtyLayer
+   *   setLayerParam()      layers[id].params[n]   -> _dirtyLayerParams
+   *   setMasterVolume()    master                 -> _dirtyTop
+   *   applyMix()           enabled/volume/params  -> _dirtyLayerParams per id
+   *
+   * Deliberately NOT invalidating:
+   *   fadeMasterTo()  does not touch `master` by design — the sleep timer fades
+   *                   to zero and later restores getState().master, so the
+   *                   logical level must survive the fade.
+   *   setNurserySafe() `_nursery` is not part of EngineState (isNurserySafe()).
+   *   _applyLayer / _ensureLayer / _disposeLayer / _buildGraph / _wake — these
+   *                   only read this.layers and touch AudioNodes.
+   */
+  private _dirtyTop(): void {
+    this._stateCache = null;
+  }
+
+  private _dirtyLayer(id: SoundId): void {
+    this._layerCache[id] = null;
+    this._layersCache = null;
+    this._stateCache = null;
+  }
+
+  private _dirtyLayerParams(id: SoundId): void {
+    this._paramsCache[id] = null;
+    this._dirtyLayer(id);
+  }
+
+  /**
+   * The mix as the UI sees it.
+   *
+   * FROZEN CONTRACT: the returned shape is exactly
+   * `{ master, running, layers: { <id>: { enabled, volume, params } } }`, with
+   * `layers` keyed in SOUND_IDS order. That is unchanged from the version that
+   * rebuilt all 23 objects on every call.
+   *
+   * This is called on every setLayerVolume, i.e. ~60x/second during a slider
+   * drag, and five bus subscribers fan out from the emit. So the result is
+   * cached, and only the parts that are actually dirty are rebuilt.
+   *
+   * THE INVARIANT THAT MAKES IT SAFE: nothing here is ever mutated in place
+   * after it has been handed out. A changed layer gets a brand-new LayerState
+   * (and a brand-new params object if params moved); the unchanged ten keep
+   * their previous identity. So a caller that holds on to a previous result —
+   * MixesSheet stores `getState().layers` straight into a SavedMix — keeps a
+   * snapshot with exactly the semantics the deep clone gave it. Copy-on-write,
+   * not shared mutable state.
+   *
+   * Cost: unchanged state -> 0 allocations. A volume or enable tick -> 3 (one
+   * LayerState, the layers record, the EngineState). A params tick -> 4. A
+   * master tick -> 1.
+   */
   getState(): EngineState {
-    const layers = {} as Record<SoundId, LayerState>;
-    for (const id of SOUND_IDS) {
-      const L = this.layers[id];
-      layers[id] = { enabled: L.enabled, volume: L.volume, params: { ...L.params } };
+    const cached = this._stateCache;
+    if (cached) return cached;
+
+    let layers = this._layersCache;
+    if (!layers) {
+      const next = {} as Record<SoundId, LayerState>;
+      for (const id of SOUND_IDS) {
+        let snap = this._layerCache[id];
+        if (!snap) {
+          const L = this.layers[id];
+          let params = this._paramsCache[id];
+          if (!params) {
+            params = { ...L.params };
+            this._paramsCache[id] = params;
+          }
+          snap = { enabled: L.enabled, volume: L.volume, params };
+          this._layerCache[id] = snap;
+        }
+        next[id] = snap;
+      }
+      layers = next;
+      this._layersCache = next;
     }
-    return { master: this.master, running: this._running, layers };
+
+    const state: EngineState = { master: this.master, running: this._running, layers };
+    this._stateCache = state;
+    return state;
   }
 
   applyMix(mix: MixSpec): void {
@@ -385,6 +493,9 @@ export class AudioEngine {
       } else {
         L.enabled = false;
       }
+      // Dirty unconditionally: applyMix rewrites `enabled` on every layer, and
+      // a preset that only *drops* a layer still changes it.
+      this._dirtyLayerParams(id);
     }
     // One pass over the whole graph after the state settles, so a preset swap is
     // a single crossfade rather than eleven independent ones.
