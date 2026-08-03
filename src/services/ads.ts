@@ -146,6 +146,28 @@ const REWARDED_TIMEOUT_MS = 30_000;
 
 export type RewardedFailure = 'unavailable' | 'declined' | null;
 
+/**
+ * THE GRACE RULE, as a pure function.
+ *
+ * An ad that never loaded is not a decline. Only 'declined' — an ad that really
+ * played and was closed early — withholds the night pass; every other failure
+ * grants it anyway. This is deliberately generous: locking someone out of
+ * falling asleep because our ad network had no fill is a real harm, and the
+ * alternative failure mode costs us a few cents.
+ *
+ * It lives here, extracted and exported, for one reason: this rule was once
+ * specified against `Ads.isAvailable()` — which reports that the SDK started,
+ * not that an ad can be delivered — was implemented exactly as written, passed
+ * review, and silently refused to unlock anything on a device. It is the worst
+ * bug history in this repository and it was previously unreachable by any test,
+ * because it lived inside a `useCallback` in a sheet component.
+ *
+ * Additive only: the frozen `Ads` public contract is unchanged.
+ */
+export function shouldGrantNightPass(earned: boolean, failure: RewardedFailure): boolean {
+  return earned || failure !== 'declined';
+}
+
 let initialised = false; // init() ran to completion on a native platform
 let initFailed = false; // init() threw — treat the whole module as unavailable
 let adsDisabled = false; // explicit kill switch (premium)

@@ -16,7 +16,8 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { toast } from '../../core/bus';
 import { EVIDENCE } from '../../data/evidence';
-import { Ads } from '../../services/ads';
+import { Ads, shouldGrantNightPass } from '../../services/ads';
+import type { RewardedFailure } from '../../services/ads';
 import { Billing } from '../../services/billing';
 import { Entitlements } from '../../services/entitlements';
 import type { SoundId } from '../../types';
@@ -92,13 +93,13 @@ export function PaywallSheet(): React.JSX.Element {
     // available as soon as it initialises, which stays true even when the
     // network cannot deliver a single impression. Only a 'declined' outcome
     // means an ad actually played and the user closed it early.
-    let reason: string | null = 'unavailable';
+    let reason: RewardedFailure = 'unavailable';
     try {
       reason = Ads.lastRewardedFailure();
     } catch {
       reason = 'unavailable';
     }
-    if (!earned && reason !== 'declined') earned = true;
+    earned = shouldGrantNightPass(earned, reason);
 
     setBusy(false);
 
