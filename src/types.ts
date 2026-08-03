@@ -25,7 +25,7 @@ export const SCENE_IDS = ['rain', 'embers', 'waves', 'stars', 'moonrise'] as con
 
 export type SceneId = (typeof SCENE_IDS)[number];
 
-export type ScreenName = 'mixer' | 'bedside' | 'breathing';
+export type ScreenName = 'welcome' | 'mixer' | 'bedside' | 'breathing';
 
 /** Layer params are a small closed set, but layers only read what they know. */
 export type LayerParams = Record<string, number>;

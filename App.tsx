@@ -25,6 +25,7 @@ import { engine } from './src/audio/engine';
 import { bus, toast } from './src/core/bus';
 import { getSettings, hydrate, KEYS, read, setSettings, write } from './src/core/store';
 import { SleepTimer } from './src/core/timer';
+import { setWelcomeMode } from './src/scenes/moonrise';
 import { Scenes } from './src/scenes/renderer';
 import { SceneView } from './src/scenes/SceneView';
 import { AdBanner } from './src/services/AdBanner';
@@ -32,7 +33,7 @@ import { Ads } from './src/services/ads';
 import { Billing } from './src/services/billing';
 import { Entitlements } from './src/services/entitlements';
 import { Native } from './src/services/native';
-import type { EngineState, MixSpec, ScreenName, SoundId } from './src/types';
+import type { EngineState, MixSpec, SceneId, ScreenName, SoundId } from './src/types';
 import { BottomBar } from './src/ui/components/BottomBar';
 import { ToastHost } from './src/ui/components/ToastHost';
 import { primeSceneAccent, useBusEvent } from './src/ui/hooks';
@@ -43,6 +44,7 @@ import { BreathingOverlay, openBreathing } from './src/ui/overlays/BreathingOver
 import { MixerScreen } from './src/ui/screens/MixerScreen';
 import { MoonTap } from './src/ui/screens/MoonTap';
 import { applyPreset } from './src/ui/screens/PresetRow';
+import { WelcomeScreen } from './src/ui/screens/WelcomeScreen';
 import { EvidenceSheet } from './src/ui/sheets/EvidenceSheet';
 import { MixesSheet } from './src/ui/sheets/MixesSheet';
 import { PaywallSheet } from './src/ui/sheets/PaywallSheet';
@@ -78,6 +80,10 @@ export default function App(): React.JSX.Element {
       if (getSettings().nurserySafe) engine.setNurserySafe(true);
 
       restoreSession();
+      // Whatever the sleeper actually uses. The welcome screen borrows the
+      // stage from it and hands it straight back.
+      sceneBehindWelcome = Scenes.getScene();
+      stageWelcome();
       setReady(true);
     })();
     return () => {
@@ -91,6 +97,34 @@ export default function App(): React.JSX.Element {
       <StatusBar style="light" />
     </SafeAreaProvider>
   );
+}
+
+/**
+ * The scene restoreSession() settled on, held while Moonrise has the stage.
+ *
+ * Read back rather than derived from settings: restoreSession has two paths and
+ * only one of them goes through settings.scene. Scenes.setScene() does not emit
+ * 'scene:changed', so showing Moonrise here never persists it — the sleeper's
+ * own scene is still the one on disk.
+ */
+let sceneBehindWelcome: SceneId = 'rain';
+
+/**
+ * Put the Moonrise meadow on screen for the welcome screen and let it move.
+ *
+ * The renderer is paused until audio starts and a still frame has no sheep in
+ * it by design (drawStill arms the sheep and draws none), so this is the one
+ * place the scene has to be alive with nothing playing. enterFromWelcome() puts
+ * both of those back.
+ */
+function stageWelcome(): void {
+  try {
+    setWelcomeMode(true);
+    Scenes.setScene('moonrise');
+    Scenes.resume();
+  } catch {
+    /* renderer is optional */
+  }
 }
 
 /** Restore the last mix, or fall back to the default preset. */
@@ -127,7 +161,11 @@ function restoreSession(): void {
 function Root(): React.JSX.Element {
   const insets = useSafeAreaInsets();
   const [avoidRects, setAvoidRects] = useState<LayoutRectangle[]>([]);
-  const screenRef = useRef<ScreenName>('mixer');
+  /** The mixer is mounted, i.e. the welcome screen has been tapped through. */
+  const [entered, setEntered] = useState(false);
+  /** The welcome screen is still on the tree — outlives `entered` by one dip. */
+  const [welcoming, setWelcoming] = useState(true);
+  const screenRef = useRef<ScreenName>('welcome');
   const persistTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingState = useRef<EngineState | null>(null);
 
@@ -152,6 +190,29 @@ function Root(): React.JSX.Element {
       }
     })();
   }, []);
+
+  /* ------------------------------------------------------------ welcome --- */
+
+  /**
+   * Fired at the peak of the welcome screen's dip, so none of this is seen
+   * happening: hand the stage back to the sleeper's scene, stop the loop again
+   * unless sound is playing, and let the mixer mount.
+   */
+  const enterFromWelcome = useCallback(() => {
+    try {
+      setWelcomeMode(false);
+      Scenes.setScene(sceneBehindWelcome);
+      // Back to the battery posture: the renderer is only ever live while
+      // something is playing.
+      if (!engine.isRunning()) Scenes.pause();
+    } catch {
+      /* renderer is optional */
+    }
+    setEntered(true);
+    bus.emit('screen:changed', { name: 'mixer' });
+  }, []);
+
+  const dismissWelcome = useCallback(() => setWelcoming(false), []);
 
   /* ------------------------------------------------------------ screens --- */
 
@@ -268,7 +329,7 @@ function Root(): React.JSX.Element {
       })
       .catch((err) => console.warn('[main] ads init', err));
 
-    bus.emit('screen:changed', { name: 'mixer' });
+    bus.emit('screen:changed', { name: 'welcome' });
 
     console.info(
       `[quietloom] ready — native=${Native.isNative()} premium=${Entitlements.isPremium()} pass=${Entitlements.hasNightPass()}`,
@@ -288,27 +349,38 @@ function Root(): React.JSX.Element {
   return (
     <View style={styles.root}>
       <SceneView />
-      <MixerScreen onControlsLayout={setAvoidRects} />
-      <MoonTap avoidRects={avoidRects} />
-      {/* AdBanner is layout-neutral by design; the root decides it sits
-          directly above the transport bar and never over it. */}
-      <View style={[styles.bannerSlot, { bottom: insets.bottom + BAR_HEIGHT }]}>
-        <AdBanner />
-      </View>
-      <BottomBar
-        onEmptyPlay={onEmptyPlay}
-        onTimerPress={openTimerSheet}
-        onBreathePress={openBreathing}
-        onBedsidePress={enterBedside}
-      />
 
-      <TimerSheet />
-      <PaywallSheet />
-      <EvidenceSheet />
-      <MixesSheet />
+      {/* Everything below the welcome screen stays unmounted until it is
+          tapped through: the meadow is the whole screen, and nothing behind it
+          should be tappable through a transparent overlay. */}
+      {entered && (
+        <>
+          <MixerScreen onControlsLayout={setAvoidRects} />
+          <MoonTap avoidRects={avoidRects} />
+          {/* AdBanner is layout-neutral by design; the root decides it sits
+              directly above the transport bar and never over it. */}
+          <View style={[styles.bannerSlot, { bottom: insets.bottom + BAR_HEIGHT }]}>
+            <AdBanner />
+          </View>
+          <BottomBar
+            onEmptyPlay={onEmptyPlay}
+            onTimerPress={openTimerSheet}
+            onBreathePress={openBreathing}
+            onBedsidePress={enterBedside}
+          />
 
-      <BreathingOverlay />
-      <BedsideOverlay />
+          <TimerSheet />
+          <PaywallSheet />
+          <EvidenceSheet />
+          <MixesSheet />
+
+          <BreathingOverlay />
+          <BedsideOverlay />
+        </>
+      )}
+
+      {welcoming && <WelcomeScreen onEnter={enterFromWelcome} onFinished={dismissWelcome} />}
+
       <ToastHost />
     </View>
   );

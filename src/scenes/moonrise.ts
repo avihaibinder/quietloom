@@ -36,6 +36,26 @@ const SHEEP_GAP_MAX = 120;
 const SHEEP_CROSS_MIN = 9; // seconds to cross the screen
 const SHEEP_CROSS_MAX = 11;
 
+/**
+ * Welcome-screen mode. That screen is a poster, not a window, so it obeys
+ * neither clock the live scene does.
+ *
+ * The moon is placed as if it were 22:00 — a real hour on the same night arc,
+ * which lands the disc a little left of centre and about a quarter of the way
+ * down the sky, instead of resting behind the hill where the real one belongs
+ * at breakfast. Only the POSITION is staged: the phase still comes off the
+ * synodic clock, because the phase is the part that claims to be true.
+ *
+ * The first sheep is brought forward for the same reason. At the live 60–120s
+ * cadence a sheep would essentially never appear in the few seconds this screen
+ * is up, and a sheep nobody sees is not a delighter. The rules of restraint in
+ * design/moonrise-scene-spec.md §2 govern the scene you sleep to; this is the
+ * cover of the book.
+ */
+const WELCOME_HOUR = 22;
+const WELCOME_SHEEP_MIN = 4; // seconds before the welcome screen's first sheep
+const WELCOME_SHEEP_MAX = 8;
+
 const SYNODIC = 29.53058867; // days
 const NEW_MOON_EPOCH = Date.UTC(2000, 0, 6, 18, 14); // a known new moon
 
@@ -84,6 +104,20 @@ let view = { w: 0, h: 0 };
 let moonPos = { x: 0, y: 0 };
 let moonAt = -1; // env.time the position above was computed at
 
+let welcome = false; // this scene is being shown as the welcome screen
+let welcomeSheepPending = false; // bring the next sheep forward, once
+
+/**
+ * Stage the scene for the welcome screen, or put it back. Idempotent, and the
+ * live scene is left exactly as it was the moment this goes false.
+ */
+export function setWelcomeMode(on: boolean): void {
+  if (welcome === on) return;
+  welcome = on;
+  moonAt = -1; // the moon is about to move; the 10s cache is stale
+  welcomeSheepPending = on;
+}
+
 function rand(a: number, b: number): number {
   return a + Math.random() * (b - a);
 }
@@ -105,7 +139,7 @@ function lunarPhase(nowMs: number): number {
  */
 function moonPlace(w: number, h: number, nowMs: number): { x: number; y: number } {
   const d = new Date(nowMs);
-  const hours = d.getHours() + d.getMinutes() / 60;
+  const hours = welcome ? WELCOME_HOUR : d.getHours() + d.getMinutes() / 60;
   const u = (((hours - 18) / 24) + 1) % 1; // 0 at 18:00, 0.5 at 06:00
   const night = u < 0.5;
   const p = night ? u * 2 : (u - 0.5) * 2;
@@ -508,6 +542,14 @@ function stepSheep(env: SceneEnv, dt: number): boolean {
   if (env.night) {
     armSheep(env.time);
     return false;
+  }
+
+  // Needs env.time, which setWelcomeMode() does not have, so the arming is
+  // deferred to the first frame after it.
+  if (welcomeSheepPending) {
+    welcomeSheepPending = false;
+    sheep.active = false;
+    sheep.nextAt = env.time + rand(WELCOME_SHEEP_MIN, WELCOME_SHEEP_MAX);
   }
 
   if (!sheep.active) {
