@@ -1,0 +1,475 @@
+/**
+ * Breathing pacer.
+ *
+ * Default is coherence — 6 breaths per minute, 0.1 Hz — because that is the
+ * pattern with the strongest evidence: it puts respiration, blood pressure and
+ * heart rate in phase at the resonance frequency of the baroreflex. 4-7-8 is
+ * offered second, badged Emerging, rather than the other way round.
+ *
+ * The ocean layer's swell is locked to 10 seconds, which *is* coherence pace —
+ * so if ocean is playing we offer to drive the circle straight off the audio.
+ */
+
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { AppState, Pressable, StyleSheet, Text, View } from 'react-native';
+
+import { engine } from '../../audio/engine';
+import { bus } from '../../core/bus';
+import { BREATH_EVIDENCE } from '../../data/evidence';
+import type { Badge } from '../../types';
+import { BadgeChip } from '../components/controls';
+import { LinkButton } from '../components/controls';
+import { CloseIcon } from '../components/icons';
+import { useLayersVersion, useSceneAccent, useSettings } from '../hooks';
+import { isLayerOpen, popLayer, pushLayer } from '../layers';
+import { openEvidenceData } from '../sheets/EvidenceSheet';
+import { color, radius } from '../theme';
+
+const KEY = 'breathing';
+const FRAME_MS = 1000 / 30;
+const MIN_SCALE = 0.42;
+const SPAN = 0.58; // MIN_SCALE + SPAN = 1
+
+type PatternId = 'coherence' | '478';
+
+interface Phase {
+  label: string;
+  dur: number;
+  kind: 'in' | 'out' | 'hold';
+}
+
+interface Pattern {
+  id: PatternId;
+  name: string;
+  sub: string;
+  badge: Badge;
+  phases: Phase[];
+}
+
+const PATTERNS: Record<PatternId, Pattern> = {
+  coherence: {
+    id: 'coherence',
+    name: 'Coherence',
+    sub: '6 breaths / min',
+    badge: BREATH_EVIDENCE.coherence.badge,
+    phases: [
+      { label: 'Breathe in', dur: 5, kind: 'in' },
+      { label: 'Breathe out', dur: 5, kind: 'out' },
+    ],
+  },
+  '478': {
+    id: '478',
+    name: '4-7-8',
+    sub: '4 in · 7 hold · 8 out',
+    badge: BREATH_EVIDENCE['478'].badge,
+    phases: [
+      { label: 'Breathe in', dur: 4, kind: 'in' },
+      { label: 'Hold', dur: 7, kind: 'hold' },
+      { label: 'Breathe out', dur: 8, kind: 'out' },
+    ],
+  },
+};
+
+export function isBreathingOpen(): boolean {
+  return isLayerOpen(KEY);
+}
+
+export function openBreathing(): void {
+  if (isBreathingOpen()) return;
+  pushLayer(KEY, closeBreathing);
+  bus.emit('screen:changed', { name: 'breathing' });
+}
+
+export function closeBreathing(): void {
+  if (!isBreathingOpen()) return;
+  popLayer(KEY);
+  bus.emit('screen:changed', { name: 'mixer' });
+}
+
+function easeInOut(t: number): number {
+  return 0.5 - 0.5 * Math.cos(Math.PI * Math.min(1, Math.max(0, t)));
+}
+
+function oceanAvailable(): boolean {
+  if (typeof engine.getOceanPhase !== 'function') return false;
+  const st = engine.getState();
+  return !!(st.running && st.layers.ocean?.enabled);
+}
+
+function readOceanPhase(): number {
+  try {
+    const p = engine.getOceanPhase();
+    return Number.isFinite(p) ? ((p % 1) + 1) % 1 : 0;
+  } catch {
+    return 0;
+  }
+}
+
+export function BreathingOverlay(): React.JSX.Element | null {
+  useLayersVersion();
+  const open = isBreathingOpen();
+  const accent = useSceneAccent();
+  const [settings, patchSettings] = useSettings();
+
+  const initialPattern: PatternId = PATTERNS[settings.breathPattern as PatternId]
+    ? (settings.breathPattern as PatternId)
+    : 'coherence';
+
+  const [patternId, setPatternId] = useState<PatternId>(initialPattern);
+  const [synced, setSynced] = useState(false);
+  const [scale, setScale] = useState(MIN_SCALE);
+  const [label, setLabel] = useState('Ready');
+  const [cycles, setCycles] = useState(0);
+  const [canSync, setCanSync] = useState(false);
+
+  // Loop state that must not trigger renders.
+  const raf = useRef(0);
+  const lastFrame = useRef(0);
+  const acc = useRef(0);
+  const phaseStart = useRef(0);
+  const phaseIdx = useRef(0);
+  const lastOceanPhase = useRef(0);
+  const patternRef = useRef(patternId);
+  const syncedRef = useRef(synced);
+
+  patternRef.current = patternId;
+  syncedRef.current = synced;
+
+  const tick = useCallback((now: number) => {
+    raf.current = requestAnimationFrame(tick);
+    const dt = now - lastFrame.current;
+    lastFrame.current = now;
+    acc.current += dt;
+    if (acc.current < FRAME_MS) return;
+    acc.current = 0;
+
+    const available = oceanAvailable();
+    setCanSync(available);
+
+    if (syncedRef.current && available) {
+      const p = readOceanPhase();
+      if (p < lastOceanPhase.current - 0.5) setCycles((c) => c + 1); // wrapped past the trough
+      lastOceanPhase.current = p;
+      // 0 = start of inhale, 0.5 = crest
+      setScale(MIN_SCALE + SPAN * (0.5 - 0.5 * Math.cos(2 * Math.PI * p)));
+      setLabel(p < 0.5 ? 'Breathe in' : 'Breathe out');
+      return;
+    }
+
+    if (syncedRef.current) {
+      // The ocean stopped underneath us — fall back to the timed pattern.
+      syncedRef.current = false;
+      setSynced(false);
+      phaseStart.current = now;
+    }
+
+    const pat = PATTERNS[patternRef.current] ?? PATTERNS.coherence;
+    const phase = pat.phases[phaseIdx.current % pat.phases.length];
+    const elapsed = (now - phaseStart.current) / 1000;
+    if (elapsed >= phase.dur) {
+      phaseStart.current = now;
+      phaseIdx.current = (phaseIdx.current + 1) % pat.phases.length;
+      if (phaseIdx.current === 0) setCycles((c) => c + 1);
+      return;
+    }
+    const t = elapsed / phase.dur;
+    if (phase.kind === 'in') setScale(MIN_SCALE + SPAN * easeInOut(t));
+    else if (phase.kind === 'out') setScale(1 - SPAN * easeInOut(t));
+    else setScale(1);
+    setLabel(phase.label);
+  }, []);
+
+  const stopLoop = useCallback(() => {
+    if (raf.current) cancelAnimationFrame(raf.current);
+    raf.current = 0;
+  }, []);
+
+  const startLoop = useCallback(() => {
+    if (raf.current) return;
+    lastFrame.current = Date.now();
+    acc.current = 0;
+    if (!syncedRef.current) phaseStart.current = Date.now();
+    raf.current = requestAnimationFrame(tick);
+  }, [tick]);
+
+  useEffect(() => {
+    if (!open) {
+      stopLoop();
+      return;
+    }
+    setCycles(0);
+    phaseIdx.current = 0;
+    phaseStart.current = Date.now();
+    setSynced(false);
+    syncedRef.current = false;
+    setCanSync(oceanAvailable());
+    startLoop();
+
+    const sub = AppState.addEventListener('change', (s) => {
+      if (s === 'active') startLoop();
+      else stopLoop();
+    });
+
+    return () => {
+      sub.remove();
+      stopLoop();
+    };
+  }, [open, startLoop, stopLoop]);
+
+  if (!open) return null;
+
+  const setPattern = (id: PatternId) => {
+    setPatternId(id);
+    patchSettings({ breathPattern: id });
+    phaseIdx.current = 0;
+    phaseStart.current = Date.now();
+    setCycles(0);
+    if (id !== 'coherence') {
+      setSynced(false);
+      syncedRef.current = false;
+    }
+  };
+
+  const toggleSync = () => {
+    if (!oceanAvailable()) return;
+    const next = !synced;
+    setSynced(next);
+    syncedRef.current = next;
+    if (next) {
+      setPatternId('coherence');
+      patchSettings({ breathPattern: 'coherence' });
+      setCycles(0);
+      lastOceanPhase.current = readOceanPhase();
+    } else {
+      phaseIdx.current = 0;
+      phaseStart.current = Date.now();
+    }
+  };
+
+  const ev = BREATH_EVIDENCE[patternId];
+  const whyText = synced
+    ? 'Following the ocean itself. The swell period is locked to 10 seconds — 0.1 Hz — which is the resonance frequency of the baroreflex.'
+    : (ev?.detail ?? '');
+
+  const circle = 220;
+
+  return (
+    <View style={styles.overlay}>
+      <View style={styles.top}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Close"
+          onPress={closeBreathing}
+          hitSlop={12}
+          style={styles.close}
+        >
+          <CloseIcon size={20} color={color.ink2} />
+        </Pressable>
+      </View>
+
+      <View style={styles.stage}>
+        <View
+          style={[
+            styles.halo,
+            {
+              width: circle,
+              height: circle,
+              borderRadius: circle / 2,
+              backgroundColor: accent.accentSoft,
+              opacity: 0.18 + 0.3 * (scale - MIN_SCALE),
+              transform: [{ scale: scale * 1.18 }],
+            },
+          ]}
+        />
+        <View
+          style={[
+            styles.circle,
+            {
+              width: circle,
+              height: circle,
+              borderRadius: circle / 2,
+              borderColor: accent.accent,
+              transform: [{ scale }],
+            },
+          ]}
+        />
+        <View style={styles.inner} pointerEvents="none">
+          <Text style={styles.phase}>{label}</Text>
+          <Text style={styles.count}>
+            {cycles > 0 ? `${cycles} ${cycles === 1 ? 'breath' : 'breaths'}` : ''}
+          </Text>
+        </View>
+      </View>
+
+      <View style={styles.bottom}>
+        <View style={styles.patterns}>
+          {[PATTERNS.coherence, PATTERNS['478']].map((p) => {
+            const active = p.id === patternId && !synced;
+            return (
+              <Pressable
+                key={p.id}
+                accessibilityRole="button"
+                accessibilityState={{ selected: active }}
+                onPress={() => setPattern(p.id)}
+                style={[
+                  styles.chip,
+                  active
+                    ? { borderColor: accent.accent, backgroundColor: accent.accentSoft }
+                    : null,
+                ]}
+              >
+                <View style={styles.chipTop}>
+                  <Text style={[styles.chipName, active ? { color: accent.accent } : null]}>
+                    {p.name}
+                  </Text>
+                  <BadgeChip badge={p.badge} small />
+                </View>
+                <Text style={styles.chipSub}>{p.sub}</Text>
+              </Pressable>
+            );
+          })}
+        </View>
+
+        {canSync ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityState={{ selected: synced }}
+            onPress={toggleSync}
+            style={[
+              styles.sync,
+              synced ? { borderColor: accent.accent, backgroundColor: accent.accentSoft } : null,
+            ]}
+          >
+            <Text style={[styles.syncTitle, synced ? { color: accent.accent } : null]}>
+              Sync to the waves
+            </Text>
+            <Text style={styles.syncSub}>The ocean swell is 10 seconds — exactly this pace.</Text>
+          </Pressable>
+        ) : null}
+
+        <View style={styles.why}>
+          <Text style={styles.whyText}>{whyText}</Text>
+          <LinkButton
+            onPress={() => {
+              const entry = BREATH_EVIDENCE[patternId];
+              if (entry) openEvidenceData({ ...entry, claim: entry.title }, { eyebrow: 'Breathing' });
+            }}
+          >
+            Read the evidence
+          </LinkButton>
+        </View>
+      </View>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  overlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(4,6,10,0.94)',
+    paddingHorizontal: 20,
+    paddingTop: 46,
+    paddingBottom: 30,
+    zIndex: 70,
+  },
+  top: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+  },
+  close: {
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  stage: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  halo: {
+    position: 'absolute',
+  },
+  circle: {
+    position: 'absolute',
+    borderWidth: 1.5,
+  },
+  inner: {
+    alignItems: 'center',
+  },
+  phase: {
+    color: color.ink,
+    fontSize: 19,
+    fontWeight: '300',
+    letterSpacing: 0.5,
+  },
+  count: {
+    color: color.ink4,
+    fontSize: 12,
+    marginTop: 6,
+    minHeight: 16,
+  },
+  bottom: {
+    gap: 12,
+  },
+  patterns: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  chip: {
+    flex: 1,
+    minHeight: 62,
+    justifyContent: 'center',
+    padding: 12,
+    borderWidth: 1,
+    borderColor: color.line,
+    borderRadius: radius.md,
+    backgroundColor: color.cardQuiet,
+  },
+  chipTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 3,
+  },
+  chipName: {
+    color: color.ink,
+    fontSize: 14,
+  },
+  chipSub: {
+    color: color.ink4,
+    fontSize: 11,
+  },
+  sync: {
+    minHeight: 62,
+    justifyContent: 'center',
+    padding: 12,
+    borderWidth: 1,
+    borderColor: color.line,
+    borderRadius: radius.md,
+    backgroundColor: color.cardQuiet,
+  },
+  syncTitle: {
+    color: color.ink,
+    fontSize: 14,
+    marginBottom: 2,
+  },
+  syncSub: {
+    color: color.ink4,
+    fontSize: 11,
+    lineHeight: 17,
+  },
+  why: {
+    gap: 8,
+    alignItems: 'flex-start',
+  },
+  whyText: {
+    color: color.ink3,
+    fontSize: 12,
+    lineHeight: 19,
+  },
+});
