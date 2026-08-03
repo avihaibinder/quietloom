@@ -34,7 +34,7 @@
  * event 'ads:banner' and every public method behave exactly as on web.
  */
 
-import { Platform } from 'react-native';
+import { Platform, TurboModuleRegistry } from 'react-native';
 
 // The SDK is loaded LAZILY, never at module scope. This is not a style
 // preference — it is load-bearing, and the web build did the same thing for
@@ -51,11 +51,50 @@ type AdsSdk = typeof import('react-native-google-mobile-ads');
 
 let sdk: AdsSdk | null = null;
 
+/**
+ * Is the SDK's native half actually in this binary?
+ *
+ * This check is what makes the lazy import safe, and wrapping the import in
+ * try/catch is NOT a substitute for it. Metro's module loader (guardedLoadModule
+ * in metro-runtime/src/polyfills/require.js) runs every module factory inside
+ * its own try/catch: on a throw it hands the error to ErrorUtils.reportFatalError
+ * and RETURNS, without rethrowing. So a module that blows up on evaluation does
+ * not reject the import() that asked for it — it resolves with a hollow exports
+ * object, and the catch below never runs. That is how a missing native module
+ * used to surface here as a red "Invariant Violation" in the log followed by
+ * `undefined is not a function` from init(), instead of the quiet unavailable
+ * path this module is built around.
+ *
+ * `get` is the non-throwing sibling of `getEnforcing`: it returns null for a
+ * module that is not registered, which is exactly the question being asked.
+ */
+function hasNativeAdsModule(): boolean {
+  try {
+    return TurboModuleRegistry.get('RNGoogleMobileAdsModule') != null;
+  } catch {
+    return false;
+  }
+}
+
 /** Resolve the SDK once. Returns null if it is not present or fails to load. */
 async function loadSdk(): Promise<AdsSdk | null> {
   if (sdk) return sdk;
+
+  // Ask before importing, so the SDK never gets the chance to throw at all.
+  if (!hasNativeAdsModule()) {
+    console.info('[ads] ad SDK is not in this build — running without ads');
+    return null;
+  }
+
   try {
-    sdk = await import('react-native-google-mobile-ads');
+    const mod = await import('react-native-google-mobile-ads');
+    // Belt and braces against the hollow-module case described above: only
+    // cache something that actually looks like the SDK.
+    if (typeof mod?.default !== 'function') {
+      console.warn('[ads] ad SDK loaded but is unusable — running without ads');
+      return null;
+    }
+    sdk = mod;
     return sdk;
   } catch (err) {
     console.warn('[ads] ad SDK unavailable — running without ads', err);

@@ -52,6 +52,14 @@ async function loadBanner(): Promise<BannerModule | null> {
   if (bannerModule || bannerLoadFailed) return bannerModule;
   try {
     const mod = await import('react-native-google-mobile-ads');
+    // A failed module evaluation resolves this import with a hollow object
+    // rather than rejecting it — see loadSdk() in ads.ts for why. Rendering
+    // `undefined` as a component would crash the tree, so check before caching.
+    if (typeof mod?.BannerAd !== 'function' || !mod.BannerAdSize?.ANCHORED_ADAPTIVE_BANNER) {
+      console.warn('[ads] banner component unusable — rendering nothing');
+      bannerLoadFailed = true;
+      return null;
+    }
     bannerModule = {
       BannerAd: mod.BannerAd as BannerModule['BannerAd'],
       bannerSize: mod.BannerAdSize.ANCHORED_ADAPTIVE_BANNER,
