@@ -333,6 +333,10 @@ function Root(): React.JSX.Element {
     SleepTimer.bind(engine);
     initBackgroundAudio(engine);
 
+    // The app.json plugin has already hidden the navigation bar by now — this
+    // is what makes it STAY hidden. See Native.hideNavigationBar.
+    Native.hideNavigationBar();
+
     // Android back closes the topmost surface. With nothing open we return
     // false, which minimises the app rather than destroying it — someone
     // pressing back at bedtime wants the rain to keep playing.
@@ -354,6 +358,9 @@ function Root(): React.JSX.Element {
       if (engine.isRunning()) {
         engine.start().catch(() => toast('Tap play to resume'));
       }
+      // Anything that took the screen from us — an interstitial, another app,
+      // the recents switcher — can hand it back with the bar showing.
+      Native.hideNavigationBar();
       reconcileBanner();
     });
 

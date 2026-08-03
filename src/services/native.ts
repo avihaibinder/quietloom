@@ -14,6 +14,7 @@
  *   Native.openUrl(url)          -> Promise<void>
  *   Native.onBackButton(handler) -> () => void         unsubscribe function
  *   Native.onAppStateChange(h)   -> () => void         unsubscribe function
+ *   Native.hideNavigationBar()   -> void               Android only (additive)
  *
  * ---------------------------------------------------------------------------
  * BACKGROUND AUDIO — where it actually lives in this build.
@@ -38,6 +39,9 @@
 
 import { AppState, BackHandler, Linking, Platform } from 'react-native';
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
+// `setHidden` is a static on the exported NavigationBar component, not a
+// module-level export — `import * as NavigationBar` does not reach it.
+import { NavigationBar } from 'expo-navigation-bar';
 import * as WebBrowser from 'expo-web-browser';
 
 /** Tag for our keep-awake lock so we never release someone else's. */
@@ -184,6 +188,41 @@ export const Native = {
         /* ignore */
       }
     };
+  },
+
+  /**
+   * Hide the Android navigation bar — back, home and recents.
+   *
+   * WHY THIS IS CALLED AT ALL, given app.json already sets the plugin's
+   * `hidden: true`. The two paths are not the same, and only together do they
+   * give the behaviour we want:
+   *
+   *   - The plugin writes `expoNavigationBarHidden` into the app theme, and
+   *     NavigationBarReactActivityLifecycleListener.onCreate hides the bar from
+   *     it BEFORE the JS engine starts. That is what stops the bar being on
+   *     screen for the first frames of a cold start. But it only calls
+   *     `hide()` — it never touches `systemBarsBehavior`, which stays
+   *     BEHAVIOR_DEFAULT, and under that a swipe from the bottom edge brings
+   *     the bar back AND LEAVES IT THERE for the rest of the session.
+   *   - `setHidden(true)` goes through Window.setNavigationBarHidden, which
+   *     sets BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE first. That is the sticky
+   *     immersive behaviour: a swipe shows the bar transiently and it takes
+   *     itself away again.
+   *
+   * (Both read from the module's own Kotlin — NavigationBarModule.kt and
+   * NavigationBarReactActivityLifecycleListener.kt. The SDK 57 docs describe
+   * neither, and there is no longer a setBehaviorAsync to say it with.)
+   *
+   * Safe everywhere: a no-op off Android, where the module's own fallback
+   * would otherwise log "only available on Android" on every call.
+   */
+  hideNavigationBar(): void {
+    if (Platform.OS !== 'android') return;
+    try {
+      NavigationBar.setHidden(true);
+    } catch (err) {
+      console.warn('[native] could not hide the navigation bar', err);
+    }
   },
 
   /**

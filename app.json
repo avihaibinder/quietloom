@@ -44,6 +44,12 @@
         }
       ],
       "expo-web-browser",
+      [
+        "expo-navigation-bar",
+        {
+          "hidden": true
+        }
+      ],
       "./plugins/withWindowsGitBashPath"
     ]
   }
