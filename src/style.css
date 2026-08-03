@@ -322,6 +322,9 @@ body.ui-ready #screen-mixer {
 .preset-art.scene-stars {
   background: linear-gradient(155deg, #17163a 0%, #0b0d20 55%, #04050c 100%);
 }
+.preset-art.scene-moonrise {
+  background: linear-gradient(155deg, #0a1020 0%, #070a17 55%, #03040a 100%);
+}
 
 .preset-label {
   position: relative;

@@ -22,6 +22,7 @@ import { initMixer } from './mixer.js';
 import { initTimerUI } from './timer-ui.js';
 import { initBedside } from './bedside.js';
 import { initBreathing } from './breathing.js';
+import { initMoonTap } from './moon-tap.js';
 import { closeTopSheet, anyLayerOpen, el } from './sheet.js';
 import { switchEl } from './volume-guide.js';
 import { Ads } from '../services/ads.js';
@@ -65,6 +66,7 @@ export function initUI(deps = {}) {
   wireBanner();
   wireSceneFollow();
   restoreSession();
+  initMoonTap({ Scenes }); // after restoreSession: it reads the restored scene
 
   document.body.classList.add('ui-ready');
   bus.emit('screen:changed', { name: 'mixer' });

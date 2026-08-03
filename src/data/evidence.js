@@ -131,6 +131,17 @@ export const EVIDENCE = {
       { label: 'Papalambros 2019, Ann Clin Transl Neurol', url: 'https://onlinelibrary.wiley.com/doi/full/10.1002/acn3.796' },
     ],
   },
+  moonrise: {
+    title: 'Moonrise',
+    badge: BADGE.EMERGING,
+    claim: 'A sheep crosses now and then. We never ask you to count it — counting is the folklore; imagery is the part that was actually tested.',
+    detail:
+      'Forty-one people with insomnia were each given one of three instructions for the night: distract yourself using imagery, distract yourself generally, or no instruction at all. The imagery group — told to picture a situation they found interesting and engaging, but also pleasant and relaxing — reported shorter sleep-onset latency than the no-instruction group, and rated their pre-sleep thoughts and worries as less distressing. General distraction showed no such advantage. Two honest limits: \'counting sheep\' was never one of the conditions, and the imagery was generated in the participant\'s own head in the dark, not watched on a screen. Moonrise is a nod to that finding, not a reproduction of it. One small study, a single night, not widely replicated.',
+    sources: [
+      { label: 'Harvey & Payne 2002, Behaviour Research and Therapy 40(3):267–277', url: 'https://pubmed.ncbi.nlm.nih.gov/11863237/' },
+      { label: 'Cognitive and Affective Control in Insomnia, Front Psychol 2011 (independent description of the same study)', url: 'https://www.frontiersin.org/articles/10.3389/fpsyg.2011.00349/full' },
+    ],
+  },
 };
 
 export const BREATH_EVIDENCE = {

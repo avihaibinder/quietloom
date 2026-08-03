@@ -29,6 +29,17 @@ export const PRESETS = [
     },
   },
   {
+    id: 'moonlit-meadow',
+    name: 'Moonrise',
+    scene: 'moonrise',
+    note: 'Brown noise under a quiet meadow at night. Picture somewhere pleasant, and interesting enough to hold your attention — that is the tested part, not the sheep.',
+    layers: {
+      brown: { enabled: true, volume: 0.34 },
+      crickets: { enabled: true, volume: 0.16 },
+      wind: { enabled: true, volume: 0.16 },
+    },
+  },
+  {
     id: 'rainy-cabin',
     name: 'Rainy Cabin',
     scene: 'rain',

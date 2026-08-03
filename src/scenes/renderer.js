@@ -1,7 +1,7 @@
 /**
  * Canvas scene renderer. FROZEN CONTRACT:
  *   Scenes.attach(canvas)
- *   Scenes.setScene('rain'|'embers'|'waves'|'stars')
+ *   Scenes.setScene('rain'|'embers'|'waves'|'stars'|'moonrise')
  *   Scenes.setIntensity(0..1)
  *   Scenes.setNightMode(bool)
  *   Scenes.pause() / Scenes.resume()
@@ -19,8 +19,9 @@ import { rain } from './rain.js';
 import { embers } from './embers.js';
 import { waves } from './waves.js';
 import { stars } from './stars.js';
+import { moonrise } from './moonrise.js';
 
-const SCENES = { rain, embers, waves, stars };
+const SCENES = { rain, embers, waves, stars, moonrise };
 const FRAME_MS = 1000 / 24;
 const MAX_DPR = 1.5;
 

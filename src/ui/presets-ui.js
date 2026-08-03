@@ -8,16 +8,31 @@
 
 import { bus } from '../core/bus.js';
 import { PRESETS } from '../data/presets.js';
+import { EVIDENCE } from '../data/evidence.js';
 import { Entitlements } from '../services/entitlements.js';
 import { openPaywall } from './paywall.js';
+import { infoDot, openEvidence } from './evidence-ui.js';
 import { el } from './sheet.js';
 import { openMixes } from './mixes-ui.js';
+
+/**
+ * Scene-level copy for the note card, for a scene showing with no preset behind
+ * it. Keyed by scene id — exactly like the evidence dot the card carries.
+ */
+const SCENE_NOTES = {
+  moonrise: {
+    name: 'Moonrise',
+    text: 'A quiet meadow at night. Picture somewhere pleasant, and interesting enough to hold your attention — that is the tested part, not the sheep.',
+  },
+};
 
 let engine = null;
 let Scenes = null;
 let rowEl = null;
 let noteEl = null;
 let activeId = null;
+/** True only while the note card holds scene copy rather than a preset's note. */
+let sceneNote = false;
 
 export function initPresets(deps) {
   engine = deps.engine;
@@ -32,6 +47,14 @@ export function initPresets(deps) {
   build();
   bus.on('entitlements:changed', () => build());
   bus.on('preset:cleared', () => clearActive());
+  // A scene can change with no preset behind it, and restoreSession() does
+  // exactly that on a cold boot without emitting `scene:changed`. So: listen for
+  // the scene, and re-check whenever the mixer becomes the current screen —
+  // initUI emits that once, after the session has been restored. No new events.
+  bus.on('scene:changed', () => showSceneNote());
+  bus.on('screen:changed', ({ name } = {}) => {
+    if (name === 'mixer') showSceneNote();
+  });
   document.getElementById('btn-mixes')?.addEventListener('click', () => openMixes());
 }
 
@@ -114,9 +137,14 @@ function showNote(preset, locked) {
   if (!noteEl) return;
   noteEl.textContent = '';
   noteEl.hidden = false;
+  sceneNote = false; // a preset's own note has replaced any scene copy
+  const dot = evidenceDot(preset.scene);
+  if (dot) noteEl.append(dot);
+
   noteEl.append(el('span', 'preset-note-name', preset.name));
   noteEl.append(document.createTextNode(' — '));
   noteEl.append(document.createTextNode(preset.note));
+
   if (locked?.length) {
     const b = el('button', 'link-btn inline', `Unlock the missing ${locked.length === 1 ? 'layer' : 'layers'}`);
     b.type = 'button';
@@ -126,8 +154,70 @@ function showNote(preset, locked) {
   }
 }
 
+/**
+ * A scene can carry its own evidence card. Moonrise's is normally reached by
+ * tapping the moon, but the moon is often behind this very card or below the
+ * hill, so the card carries the same info dot. Keyed off the scene, never the
+ * preset's id or name — those are free to be renamed without breaking this.
+ *
+ * Floated right so it sits in the card's top-right corner level with the name,
+ * the way every layer row carries its dot. Inline in the prose it landed beside
+ * "Unlock the missing layers" and read as if it explained the paywall. A float
+ * needs no positioning context, so nothing has to be set — or later unset — on
+ * the shared note element.
+ */
+function evidenceDot(scene) {
+  if (scene !== 'moonrise' || !EVIDENCE.moonrise) return null;
+  const dot = infoDot('The evidence behind the Moonrise scene', () => openEvidence('moonrise'));
+  dot.style.float = 'right';
+  dot.style.margin = '0 0 4px 10px';
+  return dot;
+}
+
+/**
+ * The note card for a scene with no preset behind it — the same card, made
+ * consistent with the evidence dot it carries.
+ *
+ * Precedence is a stated condition, not an accident of event order: this draws
+ * only while `activeId` is null, so a preset's own note always wins. It never
+ * sets `activeId` (no chip lights up), it never calls openPaywall, and it
+ * carries no lock pill and no unlock line — with no preset there is no
+ * locked-layer context to offer. It also clears itself when the scene changes
+ * away, so a stale card cannot sit under one of the other four scenes.
+ */
+function showSceneNote() {
+  if (!noteEl || activeId !== null) return;
+
+  let scene = null;
+  try {
+    scene = Scenes?.getScene?.();
+  } catch {
+    /* renderer is optional */
+  }
+  const copy = SCENE_NOTES[scene];
+
+  if (!copy) {
+    if (sceneNote) {
+      noteEl.textContent = '';
+      noteEl.hidden = true;
+      sceneNote = false;
+    }
+    return;
+  }
+
+  noteEl.textContent = '';
+  noteEl.hidden = false;
+  const dot = evidenceDot(scene);
+  if (dot) noteEl.append(dot);
+  noteEl.append(el('span', 'preset-note-name', copy.name));
+  noteEl.append(document.createTextNode(' — '));
+  noteEl.append(document.createTextNode(copy.text));
+  sceneNote = true;
+}
+
 /** Used on boot when restoring a session — no paywall, no toast. */
 export function clearActive() {
   activeId = null;
   if (rowEl) markActive();
+  showSceneNote();
 }
