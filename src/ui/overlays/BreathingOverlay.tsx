@@ -10,17 +10,17 @@
  * so if ocean is playing we offer to drive the circle straight off the audio.
  */
 
-import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { AppState, Pressable, StyleSheet, Text, View } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Animated, AppState, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { engine } from '../../audio/engine';
 import { bus } from '../../core/bus';
 import { BREATH_EVIDENCE } from '../../data/evidence';
-import type { Badge } from '../../types';
+import type { Badge, EngineState } from '../../types';
 import { BadgeChip } from '../components/controls';
 import { LinkButton } from '../components/controls';
 import { CloseIcon } from '../components/icons';
-import { useLayersVersion, useSceneAccent, useSettings } from '../hooks';
+import { useBusEvent, useLayersVersion, useSceneAccent, useSettings } from '../hooks';
 import { isLayerOpen, popLayer, pushLayer } from '../layers';
 import { openEvidenceData } from '../sheets/EvidenceSheet';
 import { color, radius } from '../theme';
@@ -90,10 +90,19 @@ function easeInOut(t: number): number {
   return 0.5 - 0.5 * Math.cos(Math.PI * Math.min(1, Math.max(0, t)));
 }
 
-function oceanAvailable(): boolean {
+function oceanAvailableFrom(st: EngineState): boolean {
   if (typeof engine.getOceanPhase !== 'function') return false;
-  const st = engine.getState();
   return !!(st.running && st.layers.ocean?.enabled);
+}
+
+/**
+ * NEVER call this per frame. `engine.getState()` rebuilds ~23 objects on every
+ * call; the answer only changes on 'mix:changed' (which the engine also emits
+ * immediately after audio:started / audio:stopped), so it is cached in
+ * `oceanRef` and refreshed from that event's payload instead.
+ */
+function oceanAvailable(): boolean {
+  return oceanAvailableFrom(engine.getState());
 }
 
 function readOceanPhase(): number {
@@ -117,67 +126,143 @@ export function BreathingOverlay(): React.JSX.Element | null {
 
   const [patternId, setPatternId] = useState<PatternId>(initialPattern);
   const [synced, setSynced] = useState(false);
-  const [scale, setScale] = useState(MIN_SCALE);
   const [label, setLabel] = useState('Ready');
   const [cycles, setCycles] = useState(0);
   const [canSync, setCanSync] = useState(false);
 
+  /*
+   * The circle is driven by an Animated.Value, NOT React state. Constructing it
+   * with `useNativeDriver` marks the node native up front (AnimatedValue.js:111
+   * -> __makeNative), so every `setValue()` below posts straight to the native
+   * animated node and skips the JS style flush — no React render and no
+   * reconciliation, ~30 times a second, for as long as the overlay is open.
+   * Only things a human reads (the phase label, the breath count) go through
+   * React state, and only when they actually change.
+   */
+  const scaleAnim = useRef(new Animated.Value(MIN_SCALE, { useNativeDriver: true })).current;
+
+  /*
+   * The halo's scale and opacity were `scale * 1.18` and
+   * `0.18 + 0.3 * (scale - MIN_SCALE)` computed in JS on every render. Both are
+   * linear in `scale`, so a linear interpolation over the circle's full range
+   * reproduces them EXACTLY (extrapolation is linear too) — on the same native
+   * node, off the JS thread.
+   */
+  const haloScale = useMemo(
+    () =>
+      scaleAnim.interpolate({
+        inputRange: [MIN_SCALE, 1],
+        outputRange: [MIN_SCALE * 1.18, 1.18],
+      }),
+    [scaleAnim],
+  );
+  const haloOpacity = useMemo(
+    () =>
+      scaleAnim.interpolate({
+        inputRange: [MIN_SCALE, 1],
+        outputRange: [0.18, 0.18 + 0.3 * SPAN],
+      }),
+    [scaleAnim],
+  );
+
   // Loop state that must not trigger renders.
   const raf = useRef(0);
-  const lastFrame = useRef(0);
+  /** -1 = "no previous frame yet". See the clock note in `tick`. */
+  const lastFrame = useRef(-1);
   const acc = useRef(0);
-  const phaseStart = useRef(0);
+  /** -1 = "seed me from the next frame's clock". See the note in `tick`. */
+  const phaseStart = useRef(-1);
   const phaseIdx = useRef(0);
   const lastOceanPhase = useRef(0);
   const patternRef = useRef(patternId);
   const syncedRef = useRef(synced);
+  /** Mirrors `label` so the tick can skip setState when nothing changed. */
+  const labelRef = useRef('Ready');
+  /** Cached `oceanAvailable()` — refreshed on 'mix:changed', never per frame. */
+  const oceanRef = useRef(false);
 
   patternRef.current = patternId;
   syncedRef.current = synced;
 
-  const tick = useCallback((now: number) => {
-    raf.current = requestAnimationFrame(tick);
-    const dt = now - lastFrame.current;
-    lastFrame.current = now;
-    acc.current += dt;
-    if (acc.current < FRAME_MS) return;
-    acc.current = 0;
-
-    const available = oceanAvailable();
-    setCanSync(available);
-
-    if (syncedRef.current && available) {
-      const p = readOceanPhase();
-      if (p < lastOceanPhase.current - 0.5) setCycles((c) => c + 1); // wrapped past the trough
-      lastOceanPhase.current = p;
-      // 0 = start of inhale, 0.5 = crest
-      setScale(MIN_SCALE + SPAN * (0.5 - 0.5 * Math.cos(2 * Math.PI * p)));
-      setLabel(p < 0.5 ? 'Breathe in' : 'Breathe out');
-      return;
-    }
-
-    if (syncedRef.current) {
-      // The ocean stopped underneath us — fall back to the timed pattern.
-      syncedRef.current = false;
-      setSynced(false);
-      phaseStart.current = now;
-    }
-
-    const pat = PATTERNS[patternRef.current] ?? PATTERNS.coherence;
-    const phase = pat.phases[phaseIdx.current % pat.phases.length];
-    const elapsed = (now - phaseStart.current) / 1000;
-    if (elapsed >= phase.dur) {
-      phaseStart.current = now;
-      phaseIdx.current = (phaseIdx.current + 1) % pat.phases.length;
-      if (phaseIdx.current === 0) setCycles((c) => c + 1);
-      return;
-    }
-    const t = elapsed / phase.dur;
-    if (phase.kind === 'in') setScale(MIN_SCALE + SPAN * easeInOut(t));
-    else if (phase.kind === 'out') setScale(1 - SPAN * easeInOut(t));
-    else setScale(1);
-    setLabel(phase.label);
+  const showLabel = useCallback((next: string) => {
+    if (labelRef.current === next) return;
+    labelRef.current = next;
+    setLabel(next);
   }, []);
+
+  const refreshOcean = useCallback((st?: EngineState): boolean => {
+    const available = st ? oceanAvailableFrom(st) : oceanAvailable();
+    oceanRef.current = available;
+    setCanSync((prev) => (prev === available ? prev : available));
+    return available;
+  }, []);
+
+  // 'mix:changed' carries the EngineState, so this costs no extra getState().
+  // The engine emits it immediately after audio:started and audio:stopped too
+  // (engine.ts:248-249, :263-264), so the cache tracks `running` as well.
+  useBusEvent('mix:changed', (st) => {
+    if (isBreathingOpen()) refreshOcean(st);
+  });
+
+  const tick = useCallback(
+    (now: number) => {
+      raf.current = requestAnimationFrame(tick);
+      // NOT Date.now(). requestAnimationFrame hands `tick` performance.now() —
+      // milliseconds since the app STARTED, not since 1970 — so seeding these
+      // clocks with the wall clock made the first dt about -1.79e12 ms. The
+      // accumulator went that far negative and could never climb back to a
+      // frame boundary at ~16 ms a frame, so the loop ran forever without ever
+      // advancing: the circle sat frozen at MIN_SCALE reading "Ready", and no
+      // user has ever seen the pacer move. Identical bug, identical fix, as
+      // src/scenes/SceneView.tsx:76-89. -1 is "no previous frame" — the first
+      // callback of a loop has nothing to measure against.
+      const dt = lastFrame.current < 0 ? 0 : now - lastFrame.current;
+      lastFrame.current = now;
+      acc.current += dt;
+      if (acc.current < FRAME_MS) return;
+      acc.current = 0;
+
+      const available = oceanRef.current;
+
+      if (syncedRef.current && available) {
+        const p = readOceanPhase();
+        if (p < lastOceanPhase.current - 0.5) setCycles((c) => c + 1); // wrapped past the trough
+        lastOceanPhase.current = p;
+        // 0 = start of inhale, 0.5 = crest
+        scaleAnim.setValue(MIN_SCALE + SPAN * (0.5 - 0.5 * Math.cos(2 * Math.PI * p)));
+        showLabel(p < 0.5 ? 'Breathe in' : 'Breathe out');
+        return;
+      }
+
+      if (syncedRef.current) {
+        // The ocean stopped underneath us — fall back to the timed pattern.
+        syncedRef.current = false;
+        setSynced(false);
+        phaseStart.current = now;
+      }
+
+      // `phaseStart` is compared against `now` below, so it MUST be on the same
+      // clock. -1 means "not seeded yet"; seed it from the frame clock itself
+      // rather than from any wall-clock reading.
+      if (phaseStart.current < 0) phaseStart.current = now;
+
+      const pat = PATTERNS[patternRef.current] ?? PATTERNS.coherence;
+      const phase = pat.phases[phaseIdx.current % pat.phases.length];
+      const elapsed = (now - phaseStart.current) / 1000;
+      if (elapsed >= phase.dur) {
+        phaseStart.current = now;
+        phaseIdx.current = (phaseIdx.current + 1) % pat.phases.length;
+        if (phaseIdx.current === 0) setCycles((c) => c + 1);
+        return;
+      }
+      const t = elapsed / phase.dur;
+      if (phase.kind === 'in') scaleAnim.setValue(MIN_SCALE + SPAN * easeInOut(t));
+      else if (phase.kind === 'out') scaleAnim.setValue(1 - SPAN * easeInOut(t));
+      else scaleAnim.setValue(1);
+      showLabel(phase.label);
+    },
+    [scaleAnim, showLabel],
+  );
 
   const stopLoop = useCallback(() => {
     if (raf.current) cancelAnimationFrame(raf.current);
@@ -186,9 +271,11 @@ export function BreathingOverlay(): React.JSX.Element | null {
 
   const startLoop = useCallback(() => {
     if (raf.current) return;
-    lastFrame.current = Date.now();
-    acc.current = 0;
-    if (!syncedRef.current) phaseStart.current = Date.now();
+    // -1, not Date.now() — see the clock note in `tick`.
+    lastFrame.current = -1;
+    // Prime the accumulator so the first frame advances immediately.
+    acc.current = FRAME_MS;
+    if (!syncedRef.current) phaseStart.current = -1;
     raf.current = requestAnimationFrame(tick);
   }, [tick]);
 
@@ -199,10 +286,11 @@ export function BreathingOverlay(): React.JSX.Element | null {
     }
     setCycles(0);
     phaseIdx.current = 0;
-    phaseStart.current = Date.now();
+    phaseStart.current = -1;
     setSynced(false);
     syncedRef.current = false;
-    setCanSync(oceanAvailable());
+    scaleAnim.setValue(MIN_SCALE);
+    refreshOcean();
     startLoop();
 
     const sub = AppState.addEventListener('change', (s) => {
@@ -214,7 +302,7 @@ export function BreathingOverlay(): React.JSX.Element | null {
       sub.remove();
       stopLoop();
     };
-  }, [open, startLoop, stopLoop]);
+  }, [open, refreshOcean, scaleAnim, startLoop, stopLoop]);
 
   if (!open) return null;
 
@@ -222,7 +310,8 @@ export function BreathingOverlay(): React.JSX.Element | null {
     setPatternId(id);
     patchSettings({ breathPattern: id });
     phaseIdx.current = 0;
-    phaseStart.current = Date.now();
+    // -1, not Date.now() — the loop reseeds this from its own clock.
+    phaseStart.current = -1;
     setCycles(0);
     if (id !== 'coherence') {
       setSynced(false);
@@ -231,7 +320,7 @@ export function BreathingOverlay(): React.JSX.Element | null {
   };
 
   const toggleSync = () => {
-    if (!oceanAvailable()) return;
+    if (!oceanRef.current) return;
     const next = !synced;
     setSynced(next);
     syncedRef.current = next;
@@ -242,7 +331,8 @@ export function BreathingOverlay(): React.JSX.Element | null {
       lastOceanPhase.current = readOceanPhase();
     } else {
       phaseIdx.current = 0;
-      phaseStart.current = Date.now();
+      // -1, not Date.now() — the loop reseeds this from its own clock.
+      phaseStart.current = -1;
     }
   };
 
@@ -268,7 +358,7 @@ export function BreathingOverlay(): React.JSX.Element | null {
       </View>
 
       <View style={styles.stage}>
-        <View
+        <Animated.View
           style={[
             styles.halo,
             {
@@ -276,12 +366,12 @@ export function BreathingOverlay(): React.JSX.Element | null {
               height: circle,
               borderRadius: circle / 2,
               backgroundColor: accent.accentSoft,
-              opacity: 0.18 + 0.3 * (scale - MIN_SCALE),
-              transform: [{ scale: scale * 1.18 }],
+              opacity: haloOpacity,
+              transform: [{ scale: haloScale }],
             },
           ]}
         />
-        <View
+        <Animated.View
           style={[
             styles.circle,
             {
@@ -289,7 +379,7 @@ export function BreathingOverlay(): React.JSX.Element | null {
               height: circle,
               borderRadius: circle / 2,
               borderColor: accent.accent,
-              transform: [{ scale }],
+              transform: [{ scale: scaleAnim }],
             },
           ]}
         />
