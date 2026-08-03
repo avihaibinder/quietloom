@@ -45,6 +45,11 @@ npm run typecheck                      # tsc --noEmit, no device needed
 `app.json`, so anything you are tempted to edit by hand in there belongs in `app.json` or a config
 plugin instead — otherwise the next prebuild silently throws your change away.
 
+Building on Windows needs Git for Windows installed at its default location: `react-native-audio-api`
+runs a bash script from Gradle and reaches for `C:\Program Files\Git\usr\bin\bash.exe` by absolute
+path. [`plugins/withWindowsGitBashPath.js`](plugins/withWindowsGitBashPath.js) then repairs that
+script's `PATH` — without it the build dies on `mkdir: command not found`.
+
 There is no browser dev mode any more. The audio engine, the scenes and the ad SDK are all native
 modules, so a device or emulator is the development loop. `npm run typecheck` and Metro's bundler
 still catch most mistakes without one.
