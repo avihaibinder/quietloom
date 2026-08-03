@@ -104,13 +104,20 @@ function normalise(data: Float32Array, peak: number): void {
  * wrapping from the last sample to the first is continuous in both value and
  * spectrum. Equal power (sin/cos) rather than linear keeps the RMS constant
  * across the seam — two uncorrelated noise segments would dip 3 dB otherwise.
+ *
+ * Returns a `slice`, not a `subarray`. That is not fussiness: subarray hands
+ * back a *view* that still points at the full (n + xfade) ArrayBuffer, and
+ * this library's native copyToChannel measures the backing buffer rather than
+ * the view, so it sees xfade too many samples and throws "Not enough space to
+ * copy to destination." The browser sized the copy from the view's own length
+ * and never complained, which is exactly why the bug survived the port.
  */
 function sealLoop(long: Float32Array<ArrayBuffer>, n: number, xfade: number): Float32Array<ArrayBuffer> {
   for (let i = 0; i < xfade; i++) {
     const a = (Math.PI * 0.5 * i) / xfade;
     long[i] = long[n + i] * Math.cos(a) + long[i] * Math.sin(a);
   }
-  return long.subarray(0, n);
+  return long.slice(0, n);
 }
 
 /**
