@@ -10,19 +10,22 @@ import { StyleSheet, Text, View } from 'react-native';
 import { engine } from '../../audio/engine';
 import { InfoDot } from '../components/controls';
 import { SliderRow } from '../components/SliderRow';
-import { useBusEvent, useSettings } from '../hooks';
+import { useBusEvent, useMasterVolume, useSettings } from '../hooks';
 import { openVolumeGuide } from '../sheets/EvidenceSheet';
 import { color, radius } from '../theme';
 
 /** Hard ceiling on the master fader when the nursery cap is on. */
 export const NURSERY_MAX = 0.45;
 
-export interface MasterRowProps {
-  master: number;
-}
+/* Module constants, so the slider's props keep a stable identity. */
+const fmtLevel = (v: number): string => `${Math.round(v)}`;
+const setMaster = (v: number): void => engine.setMasterVolume(v / 100);
 
-export function MasterRow({ master }: MasterRowProps): React.JSX.Element {
+function MasterRowBase(): React.JSX.Element {
   const [settings] = useSettings();
+  // Subscribed straight to the master volume: a layer slider moving no longer
+  // re-renders this row, and this row moving no longer re-renders the mixer.
+  const master = useMasterVolume();
   const safe = settings.nurserySafe === true;
 
   /** Re-reads the nursery-safe setting and hard-caps the fader. */
@@ -69,14 +72,24 @@ export function MasterRow({ master }: MasterRowProps): React.JSX.Element {
         max={max}
         step={1}
         value={value}
-        format={(v) => `${Math.round(v)}`}
-        onChange={(v) => engine.setMasterVolume(v / 100)}
+        format={fmtLevel}
+        onChange={setMaster}
         style={styles.slider}
       />
       <Text style={[styles.note, noteStyle]}>{note}</Text>
     </View>
   );
 }
+
+/**
+ * Memoised. Everything this row draws now comes from a store it subscribes to
+ * itself — the master volume by value, and the nursery-safe setting — so it
+ * takes no props at all and a mixer re-render can never drag it along. There
+ * is nothing left to compare, which is the point: the value comparison happens
+ * in `useMasterVolume`'s store (hooks.ts), not in a prop comparator that a
+ * freshly allocated EngineState would defeat.
+ */
+export const MasterRow = React.memo(MasterRowBase);
 
 const styles = StyleSheet.create({
   wrap: {

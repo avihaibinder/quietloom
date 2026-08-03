@@ -23,7 +23,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { engine } from '../../audio/engine';
 import { Scenes } from '../../scenes/renderer';
 import { Entitlements } from '../../services/entitlements';
-import { SOUND_IDS, type EngineState, type SoundId } from '../../types';
+import { SOUND_IDS, type SoundId } from '../../types';
 import { GhostButton, LinkButton, SwitchPill } from '../components/controls';
 import { useBusEvent, useSettings } from '../hooks';
 import { openBadgeLegend } from '../sheets/EvidenceSheet';
@@ -71,20 +71,40 @@ export interface MixerScreenProps {
   onControlsLayout?: (rects: LayoutRectangle[]) => void;
 }
 
+/** True when two rect lists describe the same boxes in the same order. */
+function rectsEqual(a: readonly LayoutRectangle[], b: readonly LayoutRectangle[]): boolean {
+  if (a === b) return true;
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i += 1) {
+    const p = a[i];
+    const q = b[i];
+    if (p.x !== q.x || p.y !== q.y || p.width !== q.width || p.height !== q.height) return false;
+  }
+  return true;
+}
+
 export function MixerScreen({ onControlsLayout }: MixerScreenProps): React.JSX.Element {
   const insets = useSafeAreaInsets();
   const [settings, patchSettings] = useSettings();
-  const [state, setState] = useState<EngineState>(() => engine.getState());
   const [bannerH, setBannerH] = useState(0);
   const [entVersion, setEntVersion] = useState(0);
 
-  useBusEvent('mix:changed', setState);
+  /*
+   * This screen deliberately does NOT subscribe to 'mix:changed'. It used to
+   * take the whole EngineState on every emit — i.e. ~60 times a second during
+   * a slider drag — and re-render the header, the presets, all eleven cards,
+   * every slider and the master row with it. Each card now subscribes to its
+   * own layer (useLayerState) and MasterRow to the master (useMasterVolume),
+   * so a drag re-renders one card instead of the screen.
+   */
   useBusEvent('entitlements:changed', () => setEntVersion((v) => v + 1));
   useBusEvent('ads:banner', ({ visible, heightPx }) =>
     setBannerH(visible ? Math.max(0, heightPx) : 0),
   );
 
-  // A lock can disappear mid-session, so the layer list is keyed off this.
+  // A lock can disappear mid-session, so the layer list is keyed off this: the
+  // bump re-renders this screen, which re-reads Entitlements.isUnlocked for
+  // each card, which is what the cards' memo compares.
   void entVersion;
 
   const groups = useMemo(() => groupsForIds(SOUND_IDS), []);
@@ -102,6 +122,12 @@ export function MixerScreen({ onControlsLayout }: MixerScreenProps): React.JSX.E
       try {
         if (engine.isRunning()) Scenes.resume();
         else Scenes.pause();
+        // reduceMotion lives in the store, not in the renderer, so nothing
+        // above tells it the answer changed: resume() and pause() both
+        // early-return when the renderer is already in that state, which left
+        // the loop animating at 24fps all night after switching reduce motion
+        // ON while playing. refresh() re-asks unconditionally.
+        Scenes.refresh();
       } catch {
         /* renderer is optional */
       }
@@ -117,16 +143,29 @@ export function MixerScreen({ onControlsLayout }: MixerScreenProps): React.JSX.E
    * top. Republished on a 140 ms debounce while scrolling — the same interval
    * the web build used, and enough to keep a 24fps scene from re-rendering the
    * whole screen on every scroll event.
+   *
+   * The array is rebuilt from scratch each time, so its identity always
+   * changes and the receiver's state setter would always re-render the app
+   * root. We therefore compare the boxes BY VALUE and do not publish at all
+   * when nothing moved — a relayout that lands in the same place, or a scroll
+   * that settles back on the same offset, is now free. The
+   * `onControlsLayout(rects)` contract is unchanged.
    */
   const controlRects = useRef<Record<string, LayoutRectangle>>({});
   const scrollY = useRef(0);
   const publishTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const publishedRects = useRef<LayoutRectangle[] | null>(null);
 
   const publishRects = useCallback(() => {
     if (!onControlsLayout) return;
-    onControlsLayout(
-      Object.values(controlRects.current).map((r) => ({ ...r, y: r.y - scrollY.current })),
-    );
+    const next = Object.values(controlRects.current).map((r) => ({
+      ...r,
+      y: r.y - scrollY.current,
+    }));
+    const prev = publishedRects.current;
+    if (prev && rectsEqual(prev, next)) return;
+    publishedRects.current = next;
+    onControlsLayout(next);
   }, [onControlsLayout]);
 
   const schedulePublish = useCallback(() => {
@@ -205,13 +244,13 @@ export function MixerScreen({ onControlsLayout }: MixerScreenProps): React.JSX.E
             <Text style={styles.groupName}>{group.name}</Text>
             {group.note ? <Text style={styles.groupNote}>{group.note}</Text> : null}
             {group.ids.map((id) => (
-              <LayerCard key={id} id={id} layer={state.layers[id]} />
+              <LayerCard key={id} id={id} unlocked={Entitlements.isUnlocked(id)} />
             ))}
           </View>
         ))}
       </View>
 
-      <MasterRow master={state.master} />
+      <MasterRow />
 
       <View style={styles.card}>
         <View style={styles.settingRow}>

@@ -7,7 +7,7 @@
  * turn itself off.
  */
 
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { toast } from '../../core/bus';
@@ -17,8 +17,8 @@ import { engine } from '../../audio/engine';
 import { LinkButton, PrimaryButton, SwitchPill } from '../components/controls';
 import { Sheet } from '../components/Sheet';
 import { SheetHeader } from '../components/SheetHeader';
-import { formatClock, useBusEvent, useSceneAccent, useSettings } from '../hooks';
-import { closeSheet, openSheet } from '../sheets';
+import { formatClock, useBusEvent, useSceneAccent, useSettings, useSheet } from '../hooks';
+import { closeSheet, isSheetOpen, openSheet } from '../sheets';
 import { color, radius } from '../theme';
 import { openEvidenceData } from './EvidenceSheet';
 
@@ -82,17 +82,47 @@ const WHY_EVIDENCE = {
 
 export function TimerSheet(): React.JSX.Element {
   const accent = useSceneAccent();
+  const { open } = useSheet(SHEET_ID);
   const [settings, patchSettings] = useSettings();
   const [custom, setCustom] = useState('');
   const [remainingSec, setRemainingSec] = useState(() => SleepTimer.getRemaining());
   const [running, setRunning] = useState(() => SleepTimer.isRunning());
 
-  useBusEvent('timer:tick', ({ remainingSec: r }) => setRemainingSec(r));
+  /*
+   * The composition root mounts this sheet for the whole session, so an
+   * ungated 'timer:tick' re-rendered it once a second for the entire ~45 minute
+   * life of the sleep timer — roughly 2,700 renders of a sheet nobody is
+   * looking at. Gate it on being open, the same way BedsideOverlay.tsx:106
+   * gates its own 'timer:tick' handler on isBedsideOpen().
+   *
+   * This only gates the RE-RENDER. The countdown itself lives in
+   * core/timer.ts on a deadline (`Date.now() + minutes * 60_000`, timer.ts:40)
+   * and its setInterval, the fade arming and 'timer:done' are all untouched by
+   * anything here — the timer keeps time identically whether or not the sheet
+   * is on screen.
+   */
+  useBusEvent('timer:tick', ({ remainingSec: r }) => {
+    if (isSheetOpen(SHEET_ID)) setRemainingSec(r);
+  });
+  // 'timer:set' and 'timer:done' fire at most a handful of times a session, so
+  // they stay ungated — there is nothing to save and it keeps `running` honest.
   useBusEvent('timer:set', () => setRunning(SleepTimer.isRunning()));
   useBusEvent('timer:done', () => {
     setRunning(false);
     setRemainingSec(0);
   });
+
+  /*
+   * Resync the instant it opens so the gate above can never show a stale
+   * countdown. getRemaining() is computed from the deadline (timer.ts:65-68),
+   * not accumulated from ticks, so it is exact no matter how many ticks we
+   * skipped while closed.
+   */
+  useEffect(() => {
+    if (!open) return;
+    setRemainingSec(SleepTimer.getRemaining());
+    setRunning(SleepTimer.isRunning());
+  }, [open]);
 
   const applyChoice = useCallback(
     (minutes: number | null) => {

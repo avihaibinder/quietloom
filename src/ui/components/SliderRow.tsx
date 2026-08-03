@@ -36,7 +36,7 @@ export interface SliderRowProps {
   style?: StyleProp<ViewStyle>;
 }
 
-export function SliderRow({
+function SliderRowBase({
   label,
   hint,
   min,
@@ -100,6 +100,19 @@ export function SliderRow({
     </View>
   );
 }
+
+/**
+ * Memoised on a shallow prop compare, which here IS a value compare: every
+ * prop is a primitive except `format`, `onChange` and `style`, and all three
+ * are stable at both call sites (module-constant formatters, useCallback'd
+ * handlers, StyleSheet refs). So a card that re-renders because its level
+ * moved no longer re-renders its other sliders.
+ *
+ * This does not touch the drag path. The thumb is still driven by this
+ * component's own state at the full rate of the native onValueChange, and
+ * nothing about the engine call is throttled or deferred.
+ */
+export const SliderRow = React.memo(SliderRowBase);
 
 const styles = StyleSheet.create({
   row: {

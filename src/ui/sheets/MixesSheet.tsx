@@ -3,7 +3,7 @@
  * KEYS.lastMix on every change so a restart lands you where you left off.
  */
 
-import React, { useCallback, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { PanResponder, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { engine } from '../../audio/engine';
@@ -15,9 +15,9 @@ import { DangerButton, LinkButton, PrimaryButton } from '../components/controls'
 import { MixPlayIcon } from '../components/icons';
 import { Sheet } from '../components/Sheet';
 import { SheetHeader } from '../components/SheetHeader';
-import { useBusEvent, useSceneAccent } from '../hooks';
+import { useBusEvent, useSceneAccent, useSheet } from '../hooks';
 import { activeLayerIds, describeMix } from '../mixState';
-import { closeSheet, openSheet } from '../sheets';
+import { closeSheet, isSheetOpen, openSheet } from '../sheets';
 import { color, radius } from '../theme';
 import { openPaywall } from './PaywallSheet';
 
@@ -42,12 +42,38 @@ function saveMixes(list: SavedMix[]): void {
 }
 
 export function MixesSheet(): React.JSX.Element {
+  const { open } = useSheet(SHEET_ID);
   const [name, setName] = useState('');
   const [list, setList] = useState<SavedMix[]>(() => loadMixes());
   const [state, setState] = useState<EngineState>(() => engine.getState());
   const [confirming, setConfirming] = useState<string | null>(null);
 
-  useBusEvent('mix:changed', setState);
+  /*
+   * 'mix:changed' is an ANIMATION-frequency event: the mixer's sliders emit it
+   * on every touch-move. The composition root mounts this sheet for the whole
+   * session, so taking the state unconditionally re-rendered the entire tree
+   * below — the `current` useMemo, every saved-mix row and its PanResponder —
+   * on every tick of every slider drag in the app, with the sheet CLOSED and
+   * nobody looking. Gate it on being open, the same way BedsideOverlay.tsx:109
+   * gates on isBedsideOpen().
+   */
+  useBusEvent('mix:changed', (s) => {
+    if (isSheetOpen(SHEET_ID)) setState(s);
+  });
+
+  /*
+   * ...and resync the instant it opens, so gating can never leave the sheet
+   * showing state from whenever it was last closed. This runs BEFORE the first
+   * painted frame of the open animation (a layout effect isn't needed: `open`
+   * flips on the same commit that starts <Sheet>'s 260 ms slide-up, and the
+   * panel begins fully off-screen).
+   */
+  useEffect(() => {
+    if (!open) return;
+    setState(engine.getState());
+    setList(loadMixes());
+    setConfirming(null);
+  }, [open]);
 
   const current = useMemo(() => activeLayerIds(state), [state]);
 
@@ -176,6 +202,17 @@ function MixRow({ mix, confirming, onArm, onKeep, onDelete, onPlay }: MixRowProp
   const accent = useSceneAccent();
   const armedRef = useRef(false);
 
+  /*
+   * Latest-ref, the same pattern useBusEvent uses in hooks.ts. The parent hands
+   * us a brand-new inline `onArm` closure on every one of its renders, and it
+   * was in the deps below — so the whole PanResponder was torn down and rebuilt
+   * on every parent render, for every row, while the sheet was open. Reading
+   * the freshest handler at call time instead lets the responder be built
+   * exactly once per row without ever going stale.
+   */
+  const onArmRef = useRef(onArm);
+  onArmRef.current = onArm;
+
   // Swipe-left arms the same confirm state the long-press does. Claiming the
   // responder only past a clear horizontal drag keeps the sheet's own
   // drag-to-dismiss (vertical) working underneath.
@@ -186,7 +223,7 @@ function MixRow({ mix, confirming, onArm, onKeep, onDelete, onPlay }: MixRowProp
         onPanResponderMove: (_e, g) => {
           if (g.dx < SWIPE_PX && !armedRef.current) {
             armedRef.current = true;
-            onArm();
+            onArmRef.current();
           }
         },
         onPanResponderRelease: () => {
@@ -196,7 +233,7 @@ function MixRow({ mix, confirming, onArm, onKeep, onDelete, onPlay }: MixRowProp
           armedRef.current = false;
         },
       }),
-    [onArm],
+    [],
   );
 
   if (confirming) {

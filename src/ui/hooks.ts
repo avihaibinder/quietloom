@@ -6,10 +6,19 @@
 
 import { useCallback, useEffect, useRef, useSyncExternalStore } from 'react';
 
+import { engine } from '../audio/engine';
 import { bus } from '../core/bus';
 import { getSettings, setSettings } from '../core/store';
 import type { Settings } from '../core/store';
-import type { BusEvent, BusEvents, SceneId } from '../types';
+import {
+  SOUND_IDS,
+  type BusEvent,
+  type BusEvents,
+  type EngineState,
+  type LayerState,
+  type SceneId,
+  type SoundId,
+} from '../types';
 import { getLayersVersion, subscribeLayers } from './layers';
 import { getSheetPayload, getSheetsVersion, isSheetOpen, subscribeSheets } from './sheets';
 import type { SheetId } from './sheets';
@@ -109,6 +118,139 @@ export function useSettings(): [Settings, (patch: Partial<Settings>) => void] {
     notifySettingsChanged();
   }, []);
   return [getSettings(), apply];
+}
+
+/* --------------------------------------------------------------------- mix */
+
+/*
+ * `mix:changed` is the app's only animation-frequency event: the slider fires
+ * it on every touch-move, and every emit carries a freshly allocated
+ * EngineState (engine.getState() rebuilds 1 + 11 + 11 objects). Handing that
+ * whole payload to a component therefore re-renders it ~60 times a second
+ * during a drag, whether or not anything it draws actually moved.
+ *
+ * So this module holds ONE bus subscription, splits the payload per layer and
+ * compares by VALUE. A layer's listeners are woken only when that layer's own
+ * numbers changed, so dragging rain's level re-renders the rain card and
+ * nothing else. Same shape as useSettings above — an external store plus
+ * useSyncExternalStore — and the store stays synchronous and framework-free.
+ *
+ * getState()'s shape and the mix:changed payload are frozen contracts; this
+ * only reads them.
+ */
+
+/** Returned for an id the engine does not know, so callers never see undefined. */
+const EMPTY_LAYER: LayerState = Object.freeze({ enabled: false, volume: 0, params: {} });
+
+let mixState: EngineState | null = null;
+let masterSnapshot = 0;
+/** Per-layer snapshots, replaced only when that layer's values change. */
+const layerSnapshots = new Map<SoundId, LayerState>();
+const layerListeners = new Map<SoundId, Set<() => void>>();
+const masterListeners = new Set<() => void>();
+
+/** True when two layer states would render identically. Values, not identity. */
+function layerEqual(a: LayerState | undefined, b: LayerState | undefined): boolean {
+  if (a === b) return true;
+  if (!a || !b) return false;
+  if (a.enabled !== b.enabled || a.volume !== b.volume) return false;
+  const pa = a.params;
+  const pb = b.params;
+  if (pa === pb) return true;
+  if (!pa || !pb) return false;
+  // Both directions, so an added or removed param counts as a change. Params
+  // are plain number records, so a missing key compares as undefined.
+  for (const k in pa) if (pa[k] !== pb[k]) return false;
+  for (const k in pb) if (pb[k] !== pa[k]) return false;
+  return true;
+}
+
+function notifyAll(set: Set<() => void> | undefined): void {
+  if (!set || set.size === 0) return;
+  for (const fn of [...set]) {
+    try {
+      fn();
+    } catch (err) {
+      console.error('[ui] mix listener threw', err);
+    }
+  }
+}
+
+/**
+ * Fold a new EngineState into the snapshots. Eleven value comparisons per
+ * emit, in place of the 60–100 component renders the whole-state broadcast
+ * used to cost.
+ */
+function applyMixState(next: EngineState, notify: boolean): void {
+  mixState = next;
+
+  if (next.master !== masterSnapshot) {
+    masterSnapshot = next.master;
+    if (notify) notifyAll(masterListeners);
+  }
+
+  for (const id of SOUND_IDS) {
+    const nextLayer = next.layers[id] ?? EMPTY_LAYER;
+    if (layerEqual(layerSnapshots.get(id), nextLayer)) continue;
+    layerSnapshots.set(id, nextLayer);
+    if (notify) notifyAll(layerListeners.get(id));
+  }
+}
+
+/** Seed from the engine on first read — a restored session must not paint zeroes. */
+function ensureMixState(): EngineState {
+  if (!mixState) applyMixState(engine.getState(), false);
+  return mixState as EngineState;
+}
+
+// Module-level, like the scene subscription below: the snapshots must stay
+// current even when no mixer is mounted (bedside mode has none on screen).
+bus.on('mix:changed', (state) => {
+  applyMixState(state, true);
+});
+
+function subscribeLayer(id: SoundId, fn: () => void): () => void {
+  const existing = layerListeners.get(id);
+  const set = existing ?? new Set<() => void>();
+  if (!existing) layerListeners.set(id, set);
+  set.add(fn);
+  return () => {
+    set.delete(fn);
+  };
+}
+
+function getLayerSnapshot(id: SoundId): LayerState {
+  ensureMixState();
+  return layerSnapshots.get(id) ?? EMPTY_LAYER;
+}
+
+function subscribeMaster(fn: () => void): () => void {
+  masterListeners.add(fn);
+  return () => {
+    masterListeners.delete(fn);
+  };
+}
+
+function getMasterSnapshot(): number {
+  ensureMixState();
+  return masterSnapshot;
+}
+
+/**
+ * One layer's state. Re-renders the caller ONLY when that layer's own
+ * enabled / volume / params change — not when any other layer, or the master,
+ * or `running` moves. The returned object keeps its identity until one of
+ * those values actually changes, so it is safe to use as a dependency.
+ */
+export function useLayerState(id: SoundId): LayerState {
+  const subscribe = useCallback((fn: () => void) => subscribeLayer(id, fn), [id]);
+  const snapshot = useCallback(() => getLayerSnapshot(id), [id]);
+  return useSyncExternalStore(subscribe, snapshot);
+}
+
+/** The master volume (0..1). Re-renders the caller only when it changes. */
+export function useMasterVolume(): number {
+  return useSyncExternalStore(subscribeMaster, getMasterSnapshot);
 }
 
 /* ------------------------------------------------------------------- scene */

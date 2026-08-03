@@ -13,14 +13,14 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { engine } from '../../audio/engine';
 import { EVIDENCE } from '../../data/evidence';
 import { Entitlements } from '../../services/entitlements';
-import type { LayerState, SoundId } from '../../types';
+import type { SoundId } from '../../types';
 import { BadgeChip, InfoDot, Notice } from '../components/controls';
 import { LockIcon } from '../components/icons';
 import { SliderRow } from '../components/SliderRow';
-import { useSceneAccent } from '../hooks';
+import { useLayerState, useSceneAccent } from '../hooks';
 import { openEvidence } from '../sheets/EvidenceSheet';
 import { openPaywall } from '../sheets/PaywallSheet';
-import { color, radius } from '../theme';
+import { color, radius, type SceneAccent } from '../theme';
 
 /** Per-layer body copy. Ported verbatim — each line is a research summary. */
 export const COPY: Record<SoundId, string> = {
@@ -37,21 +37,136 @@ export const COPY: Record<SoundId, string> = {
   deeppulse: 'Pink-noise pulses near 0.8 Hz, modelled on a slow-wave protocol. Experimental.',
 };
 
-const BINAURAL_CHIPS = [
+interface BinauralChipDef {
+  label: string;
+  sub: string;
+  baseHz: number;
+  beatHz: number;
+}
+
+const BINAURAL_CHIPS: readonly BinauralChipDef[] = [
   { label: 'Sleep — Fan 2024', sub: '0.25 Hz @ 250 Hz', baseHz: 250, beatHz: 0.25 },
   { label: 'Delta', sub: '3 Hz @ 250 Hz', baseHz: 250, beatHz: 3 },
   { label: 'Alpha / focus', sub: '10 Hz @ 250 Hz', baseHz: 250, beatHz: 10 },
 ];
 
+/*
+ * Slider formatters are module constants, not inline arrows. They close over
+ * nothing, and a fresh identity on every render would defeat SliderRow's memo.
+ */
+const fmtLevel = (v: number): string => `${Math.round(v)}`;
+const fmtIntensity = (v: number): string => (v < 33 ? 'Drizzle' : v < 70 ? 'Steady' : 'Downpour');
+const fmtFrequency = (v: number): string => (v < 25 ? 'Rare' : v < 60 ? 'Occasional' : 'Frequent');
+const fmtCarrier = (v: number): string => `${Math.round(v)} Hz`;
+const fmtBeat = (v: number): string => `${v} Hz`;
+
+/**
+ * One binaural preset chip. Split out so its onPress can be a stable callback
+ * instead of an arrow rebuilt inside a .map() on every render.
+ */
+const BinauralChip = React.memo(function BinauralChip({
+  def,
+  active,
+  accent,
+  onSelect,
+}: {
+  def: BinauralChipDef;
+  active: boolean;
+  accent: SceneAccent;
+  onSelect: (def: BinauralChipDef) => void;
+}): React.JSX.Element {
+  const press = useCallback(() => onSelect(def), [def, onSelect]);
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityState={{ selected: active }}
+      onPress={press}
+      style={[
+        styles.chip,
+        active ? { borderColor: accent.accent, backgroundColor: accent.accentSoft } : null,
+      ]}
+    >
+      <Text style={[styles.chipLabel, active ? { color: accent.accent } : null]}>{def.label}</Text>
+      <Text style={styles.chipSub}>{def.sub}</Text>
+    </Pressable>
+  );
+});
+
+/**
+ * The card's head: the toggle (or the padlock), the title, the badge and the
+ * evidence dot.
+ *
+ * Split out and memoised because none of it moves while a slider is being
+ * dragged — only the slider under it does. Without this, the one card that is
+ * legitimately re-rendering at touch-move rate redraws its whole head too.
+ * Purely a component boundary: the rendered view tree is unchanged.
+ */
+const LayerHeader = React.memo(function LayerHeader({
+  id,
+  on,
+  unlocked,
+  accent,
+  onActivate,
+  onEvidence,
+}: {
+  id: SoundId;
+  on: boolean;
+  unlocked: boolean;
+  accent: SceneAccent;
+  onActivate: () => void;
+  onEvidence: () => void;
+}): React.JSX.Element {
+  const info = EVIDENCE[id] ?? { title: id, badge: 'Traditional' as const };
+  return (
+    <View style={styles.top}>
+      <Pressable
+        accessibilityRole="switch"
+        accessibilityState={{ checked: on, disabled: false }}
+        accessibilityLabel={info.title}
+        accessibilityHint={unlocked ? undefined : 'Locked — opens the unlock options'}
+        onPress={onActivate}
+        style={({ pressed }) => [styles.topPress, pressed ? styles.topPressed : null]}
+      >
+        {unlocked ? (
+          <View style={[styles.track, on ? { backgroundColor: accent.accent } : null]}>
+            <View style={[styles.knob, on ? styles.knobOn : null]} />
+          </View>
+        ) : (
+          <View style={styles.lock}>
+            <LockIcon size={18} color={color.ink4} />
+          </View>
+        )}
+
+        <View style={styles.meta}>
+          <View style={styles.titleRow}>
+            <Text style={styles.name}>{info.title}</Text>
+            <BadgeChip badge={info.badge} small />
+            {!unlocked ? <Text style={styles.lockPill}>Locked</Text> : null}
+          </View>
+          <Text style={styles.desc}>{COPY[id]}</Text>
+        </View>
+      </Pressable>
+
+      <InfoDot label={`Why ${info.title}? The evidence`} onPress={onEvidence} />
+    </View>
+  );
+});
+
 export interface LayerCardProps {
   id: SoundId;
-  layer: LayerState;
+  /**
+   * Whether this layer is unlocked. Passed in rather than read here so the
+   * memo below can compare it by value — a lock can disappear mid-session and
+   * the card has to notice.
+   */
+  unlocked: boolean;
 }
 
-export function LayerCard({ id, layer }: LayerCardProps): React.JSX.Element {
+function LayerCardBase({ id, unlocked }: LayerCardProps): React.JSX.Element {
   const accent = useSceneAccent();
-  const info = EVIDENCE[id] ?? { title: id, badge: 'Traditional' as const };
-  const unlocked = Entitlements.isUnlocked(id);
+  // Per-layer subscription: this card re-renders when THIS layer moves, not
+  // when any of the other ten do.
+  const layer = useLayerState(id);
   const on = !!layer.enabled && unlocked;
 
   const activate = useCallback(() => {
@@ -62,6 +177,31 @@ export function LayerCard({ id, layer }: LayerCardProps): React.JSX.Element {
     engine.setLayerEnabled(id, !engine.getState().layers[id]?.enabled);
   }, [id]);
 
+  /*
+   * Every callback handed to a child is stable for the life of the card. These
+   * were inline arrows, which gave each child a new prop identity on every
+   * render and made memoising them pointless.
+   */
+  const showEvidence = useCallback(() => openEvidence(id), [id]);
+  const setLevel = useCallback((v: number) => engine.setLayerVolume(id, v / 100), [id]);
+  const setIntensity = useCallback(
+    (v: number) => engine.setLayerParam(id, 'intensity', v / 100),
+    [id],
+  );
+  const setFrequency = useCallback(
+    (v: number) => engine.setLayerParam(id, 'frequency', v / 100),
+    [id],
+  );
+  const setCarrier = useCallback((v: number) => engine.setLayerParam(id, 'baseHz', v), [id]);
+  const setBeat = useCallback((v: number) => engine.setLayerParam(id, 'beatHz', v), [id]);
+  const selectChip = useCallback(
+    (def: BinauralChipDef) => {
+      engine.setLayerParam(id, 'baseHz', def.baseHz);
+      engine.setLayerParam(id, 'beatHz', def.beatHz);
+    },
+    [id],
+  );
+
   return (
     <View
       style={[
@@ -70,37 +210,14 @@ export function LayerCard({ id, layer }: LayerCardProps): React.JSX.Element {
         !unlocked ? styles.locked : null,
       ]}
     >
-      <View style={styles.top}>
-        <Pressable
-          accessibilityRole="switch"
-          accessibilityState={{ checked: on, disabled: false }}
-          accessibilityLabel={info.title}
-          accessibilityHint={unlocked ? undefined : 'Locked — opens the unlock options'}
-          onPress={activate}
-          style={({ pressed }) => [styles.topPress, pressed ? styles.topPressed : null]}
-        >
-          {unlocked ? (
-            <View style={[styles.track, on ? { backgroundColor: accent.accent } : null]}>
-              <View style={[styles.knob, on ? styles.knobOn : null]} />
-            </View>
-          ) : (
-            <View style={styles.lock}>
-              <LockIcon size={18} color={color.ink4} />
-            </View>
-          )}
-
-          <View style={styles.meta}>
-            <View style={styles.titleRow}>
-              <Text style={styles.name}>{info.title}</Text>
-              <BadgeChip badge={info.badge} small />
-              {!unlocked ? <Text style={styles.lockPill}>Locked</Text> : null}
-            </View>
-            <Text style={styles.desc}>{COPY[id]}</Text>
-          </View>
-        </Pressable>
-
-        <InfoDot label={`Why ${info.title}? The evidence`} onPress={() => openEvidence(id)} />
-      </View>
+      <LayerHeader
+        id={id}
+        on={on}
+        unlocked={unlocked}
+        accent={accent}
+        onActivate={activate}
+        onEvidence={showEvidence}
+      />
 
       {unlocked && on ? (
         <View style={styles.body}>
@@ -110,8 +227,8 @@ export function LayerCard({ id, layer }: LayerCardProps): React.JSX.Element {
             max={100}
             step={1}
             value={Math.round((layer.volume ?? 0) * 100)}
-            format={(v) => `${Math.round(v)}`}
-            onChange={(v) => engine.setLayerVolume(id, v / 100)}
+            format={fmtLevel}
+            onChange={setLevel}
           />
 
           {id === 'rain' ? (
@@ -122,8 +239,8 @@ export function LayerCard({ id, layer }: LayerCardProps): React.JSX.Element {
               max={100}
               step={1}
               value={Math.round((layer.params.intensity ?? 0.5) * 100)}
-              format={(v) => (v < 33 ? 'Drizzle' : v < 70 ? 'Steady' : 'Downpour')}
-              onChange={(v) => engine.setLayerParam(id, 'intensity', v / 100)}
+              format={fmtIntensity}
+              onChange={setIntensity}
             />
           ) : null}
 
@@ -135,8 +252,8 @@ export function LayerCard({ id, layer }: LayerCardProps): React.JSX.Element {
               max={100}
               step={1}
               value={Math.round((layer.params.frequency ?? 0.3) * 100)}
-              format={(v) => (v < 25 ? 'Rare' : v < 60 ? 'Occasional' : 'Frequent')}
-              onChange={(v) => engine.setLayerParam(id, 'frequency', v / 100)}
+              format={fmtFrequency}
+              onChange={setFrequency}
             />
           ) : null}
 
@@ -149,33 +266,18 @@ export function LayerCard({ id, layer }: LayerCardProps): React.JSX.Element {
               </Notice>
 
               <View style={styles.chipRow}>
-                {BINAURAL_CHIPS.map((def) => {
-                  const active =
-                    layer.params.baseHz === def.baseHz &&
-                    Math.abs((layer.params.beatHz ?? 0) - def.beatHz) < 0.001;
-                  return (
-                    <Pressable
-                      key={def.label}
-                      accessibilityRole="button"
-                      accessibilityState={{ selected: active }}
-                      onPress={() => {
-                        engine.setLayerParam(id, 'baseHz', def.baseHz);
-                        engine.setLayerParam(id, 'beatHz', def.beatHz);
-                      }}
-                      style={[
-                        styles.chip,
-                        active
-                          ? { borderColor: accent.accent, backgroundColor: accent.accentSoft }
-                          : null,
-                      ]}
-                    >
-                      <Text style={[styles.chipLabel, active ? { color: accent.accent } : null]}>
-                        {def.label}
-                      </Text>
-                      <Text style={styles.chipSub}>{def.sub}</Text>
-                    </Pressable>
-                  );
-                })}
+                {BINAURAL_CHIPS.map((def) => (
+                  <BinauralChip
+                    key={def.label}
+                    def={def}
+                    active={
+                      layer.params.baseHz === def.baseHz &&
+                      Math.abs((layer.params.beatHz ?? 0) - def.beatHz) < 0.001
+                    }
+                    accent={accent}
+                    onSelect={selectChip}
+                  />
+                ))}
               </View>
 
               <SliderRow
@@ -184,8 +286,8 @@ export function LayerCard({ id, layer }: LayerCardProps): React.JSX.Element {
                 max={400}
                 step={5}
                 value={layer.params.baseHz ?? 250}
-                format={(v) => `${Math.round(v)} Hz`}
-                onChange={(v) => engine.setLayerParam(id, 'baseHz', v)}
+                format={fmtCarrier}
+                onChange={setCarrier}
               />
               <SliderRow
                 label="Beat"
@@ -193,8 +295,8 @@ export function LayerCard({ id, layer }: LayerCardProps): React.JSX.Element {
                 max={12}
                 step={0.25}
                 value={layer.params.beatHz ?? 0.25}
-                format={(v) => `${v} Hz`}
-                onChange={(v) => engine.setLayerParam(id, 'beatHz', v)}
+                format={fmtBeat}
+                onChange={setBeat}
               />
             </>
           ) : null}
@@ -211,6 +313,22 @@ export function LayerCard({ id, layer }: LayerCardProps): React.JSX.Element {
     </View>
   );
 }
+
+/**
+ * Compared by VALUE, never by identity.
+ *
+ * The layer's own numbers are compared in `useLayerState`'s store (hooks.ts,
+ * `layerEqual`) — once per mix:changed, rather than eleven times in eleven
+ * comparators — and reach this card as a hook, not a prop. What is left to
+ * compare here is the id and the lock, both primitives. The default shallow
+ * memo would do the same thing; this is spelled out so nobody "simplifies" a
+ * freshly allocated object back into the props and silently loses the memo.
+ */
+function propsEqual(a: LayerCardProps, b: LayerCardProps): boolean {
+  return a.id === b.id && a.unlocked === b.unlocked;
+}
+
+export const LayerCard = React.memo(LayerCardBase, propsEqual);
 
 const styles = StyleSheet.create({
   card: {
