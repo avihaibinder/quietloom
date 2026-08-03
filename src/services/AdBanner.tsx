@@ -12,9 +12,8 @@
  * can reserve exactly that much space ('ads:banner' on the bus).
  */
 
-import { useCallback, useEffect, useState, type JSX } from 'react';
+import { useCallback, useEffect, useState, type ComponentType, type JSX } from 'react';
 import { StyleSheet, View, type LayoutChangeEvent } from 'react-native';
-import { BannerAd, BannerAdSize } from 'react-native-google-mobile-ads';
 
 import { bus } from '../core/bus';
 import {
@@ -25,6 +24,45 @@ import {
   reportBannerHeight,
   subscribeBanner,
 } from './ads';
+
+/**
+ * The banner view, resolved lazily.
+ *
+ * Same reason as ads.ts: react-native-google-mobile-ads throws on evaluation
+ * when its native module is missing, so importing it at module scope would
+ * take the whole app down before anything renders. A sleep app must survive a
+ * broken ad SDK, so the component is fetched on demand and this file renders
+ * nothing until (and unless) it arrives.
+ */
+interface BannerModule {
+  BannerAd: ComponentType<{
+    unitId: string;
+    size: string;
+    /** The SDK reports the filled size here — that is our real height source. */
+    onAdLoaded?: (dimensions: { width: number; height: number }) => void;
+    onAdFailedToLoad?: (error: Error) => void;
+  }>;
+  bannerSize: string;
+}
+
+let bannerModule: BannerModule | null = null;
+let bannerLoadFailed = false;
+
+async function loadBanner(): Promise<BannerModule | null> {
+  if (bannerModule || bannerLoadFailed) return bannerModule;
+  try {
+    const mod = await import('react-native-google-mobile-ads');
+    bannerModule = {
+      BannerAd: mod.BannerAd as BannerModule['BannerAd'],
+      bannerSize: mod.BannerAdSize.ANCHORED_ADAPTIVE_BANNER,
+    };
+    return bannerModule;
+  } catch (err) {
+    console.warn('[ads] banner component unavailable', err);
+    bannerLoadFailed = true;
+    return null;
+  }
+}
 
 export function AdBanner(): JSX.Element | null {
   const [, setTick] = useState(0);
@@ -65,13 +103,20 @@ export function AdBanner(): JSX.Element | null {
   }, []);
 
   const { desiredVisible } = getBannerState();
-  if (!desiredVisible || !Ads.isAvailable()) return null;
+  const wanted = desiredVisible && Ads.isAvailable();
 
+  useEffect(() => {
+    if (wanted && !bannerModule && !bannerLoadFailed) void loadBanner().then(rerender);
+  }, [rerender, wanted]);
+
+  if (!wanted || !bannerModule) return null;
+
+  const { BannerAd, bannerSize } = bannerModule;
   return (
     <View style={styles.slot} onLayout={onLayout}>
       <BannerAd
         unitId={AD_UNITS.banner}
-        size={BannerAdSize.ANCHORED_ADAPTIVE_BANNER}
+        size={bannerSize}
         onAdLoaded={onAdLoaded}
         onAdFailedToLoad={onAdFailedToLoad}
       />

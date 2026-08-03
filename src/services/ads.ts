@@ -35,14 +35,33 @@
  */
 
 import { Platform } from 'react-native';
-import mobileAds, {
-  AdEventType,
-  InterstitialAd,
-  MaxAdContentRating,
-  RewardedAd,
-  RewardedAdEventType,
-  TestIds,
-} from 'react-native-google-mobile-ads';
+
+// The SDK is loaded LAZILY, never at module scope. This is not a style
+// preference — it is load-bearing, and the web build did the same thing for
+// the same reason ("a bad plugin can never take the boot down").
+//
+// react-native-google-mobile-ads calls TurboModuleRegistry.getEnforcing() the
+// moment it is evaluated, which THROWS if the native module is missing. A
+// static import therefore turns any ad-SDK problem into a white screen before
+// a single line of Quietloom runs: no rain, no scenes, no UI. An app whose
+// whole job is to help someone sleep must not be taken down by an ad network.
+//
+// Type-only imports are erased at compile time and cannot trigger that.
+type AdsSdk = typeof import('react-native-google-mobile-ads');
+
+let sdk: AdsSdk | null = null;
+
+/** Resolve the SDK once. Returns null if it is not present or fails to load. */
+async function loadSdk(): Promise<AdsSdk | null> {
+  if (sdk) return sdk;
+  try {
+    sdk = await import('react-native-google-mobile-ads');
+    return sdk;
+  } catch (err) {
+    console.warn('[ads] ad SDK unavailable — running without ads', err);
+    return null;
+  }
+}
 
 import { bus } from '../core/bus';
 import { KEYS, read, write } from '../core/store';
@@ -51,7 +70,10 @@ import { Entitlements } from './entitlements';
 /* ------------------------------------------------------------------------ *
  * AD UNIT IDS
  *
- * These are Google's OFFICIAL TEST unit IDs (via TestIds). They always fill,
+ * These are Google's OFFICIAL TEST unit IDs, written out as literals rather
+ * than read from the SDK's TestIds constant — that constant would need the
+ * module at import time, which is exactly what this file must not do.
+ * They always fill,
  * they never earn money, and they are safe to ship to an emulator or a test
  * device.
  *
@@ -63,9 +85,9 @@ import { Entitlements } from './entitlements';
  * Also flip TEST_MODE to false at the same time.
  * ------------------------------------------------------------------------ */
 export const AD_UNITS = {
-  banner: TestIds.ADAPTIVE_BANNER, // TEST banner
-  interstitial: TestIds.INTERSTITIAL, // TEST interstitial
-  rewarded: TestIds.REWARDED, // TEST rewarded video
+  banner: 'ca-app-pub-3940256099942544/9214589741', // TEST adaptive banner
+  interstitial: 'ca-app-pub-3940256099942544/1033173712', // TEST interstitial
+  rewarded: 'ca-app-pub-3940256099942544/5224354917', // TEST rewarded video
 };
 
 /**
@@ -219,10 +241,17 @@ export const Ads = {
       return;
     }
 
+    const mod = await loadSdk();
+    if (!mod) {
+      initFailed = true;
+      return;
+    }
+
     try {
+      const mobileAds = mod.default;
       await mobileAds().setRequestConfiguration({
         // A sleep app is used by (and near) all ages. Keep the inventory tame.
-        maxAdContentRating: MaxAdContentRating.G,
+        maxAdContentRating: mod.MaxAdContentRating.G,
         tagForChildDirectedTreatment: false,
         tagForUnderAgeOfConsent: false,
       });
@@ -315,12 +344,16 @@ export const Ads = {
     const today = todayKey();
     if (read<string | null>(KEYS.lastInterstitialDay, null) === today) return false;
 
+    // canServe() implies init() completed, so the SDK is already resolved.
+    const mod = sdk;
+    if (!mod) return false;
+
     interstitialInFlight = true;
     const cleanups: Array<() => void> = [];
     let timer: ReturnType<typeof setTimeout> | null = null;
 
     try {
-      const ad = InterstitialAd.createForAdRequest(AD_UNITS.interstitial);
+      const ad = mod.InterstitialAd.createForAdRequest(AD_UNITS.interstitial);
 
       let shown = false;
       let settled = false;
@@ -333,19 +366,19 @@ export const Ads = {
         };
 
         cleanups.push(
-          ad.addAdEventListener(AdEventType.LOADED, () => {
+          ad.addAdEventListener(mod.AdEventType.LOADED, () => {
             ad.show().catch((err: unknown) => {
               console.warn('[ads] interstitial failed to show', err);
               finish(false);
             });
           }),
-          ad.addAdEventListener(AdEventType.OPENED, () => {
+          ad.addAdEventListener(mod.AdEventType.OPENED, () => {
             shown = true;
             // Do not resolve yet — wait for CLOSED so the caller knows the
             // user is back before it resumes anything.
           }),
-          ad.addAdEventListener(AdEventType.CLOSED, () => finish(shown)),
-          ad.addAdEventListener(AdEventType.ERROR, (err: Error) => {
+          ad.addAdEventListener(mod.AdEventType.CLOSED, () => finish(shown)),
+          ad.addAdEventListener(mod.AdEventType.ERROR, (err: Error) => {
             console.warn('[ads] interstitial unavailable', err);
             finish(false);
           }),
@@ -393,13 +426,19 @@ export const Ads = {
       return false;
     }
 
+    const mod = sdk;
+    if (!mod) {
+      lastRewardedFailure = 'unavailable';
+      return false;
+    }
+
     rewardedInFlight = true;
     lastRewardedFailure = 'unavailable'; // until something proves otherwise
     const cleanups: Array<() => void> = [];
     let timer: ReturnType<typeof setTimeout> | null = null;
 
     try {
-      const ad = RewardedAd.createForAdRequest(AD_UNITS.rewarded);
+      const ad = mod.RewardedAd.createForAdRequest(AD_UNITS.rewarded);
 
       let rewarded = false;
       let settled = false;
@@ -413,26 +452,26 @@ export const Ads = {
         };
 
         cleanups.push(
-          ad.addAdEventListener(RewardedAdEventType.LOADED, () => {
+          ad.addAdEventListener(mod.RewardedAdEventType.LOADED, () => {
             ad.show().catch((err: unknown) => {
               console.warn('[ads] rewarded failed to show', err);
               finish(false);
             });
           }),
-          ad.addAdEventListener(RewardedAdEventType.EARNED_REWARD, (reward) => {
+          ad.addAdEventListener(mod.RewardedAdEventType.EARNED_REWARD, (reward) => {
             // This is the ONLY event that earns the unlock.
             console.info('[ads] reward earned', reward);
             rewarded = true;
             finish(true);
           }),
-          ad.addAdEventListener(AdEventType.CLOSED, () => {
+          ad.addAdEventListener(mod.AdEventType.CLOSED, () => {
             // Order is not guaranteed; if EARNED_REWARD already fired we keep
             // true. Reaching here without a reward means an ad really played
             // and they closed it early — the one case that is a genuine
             // decline.
             finish(rewarded, 'declined');
           }),
-          ad.addAdEventListener(AdEventType.ERROR, (err: Error) => {
+          ad.addAdEventListener(mod.AdEventType.ERROR, (err: Error) => {
             console.warn('[ads] rewarded failed to load/show', err);
             finish(false);
           }),
