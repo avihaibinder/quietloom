@@ -31,5 +31,13 @@
     "web": "expo start --web",
     "typecheck": "tsc --noEmit"
   },
-  "private": true
+  "private": true,
+  "expo": {
+    "autolinking": {
+      "exclude": [
+        "react-native-google-mobile-ads"
+      ],
+      "//": "TEMPORARY. react-native-google-mobile-ads 16.4 needs Kotlin 2.3 (via play-services-ads 25.3+) and Expo SDK 57 ships 2.1.20, so its Kotlin will not compile. The app degrades to no ads and still runs. Remove this exclusion (and restore the plugin block in app.json) once the Kotlin version is raised - see HANDOFF.md \"BLOCKER: the ad SDK does not build on Expo SDK 57\"."
+    }
+  }
 }

@@ -71,21 +71,74 @@ What changed on purpose:
 
 ---
 
+## Verified on a device
+
+Run on a Pixel 9a emulator (Android 16), debug build, from a clean `expo prebuild`:
+
+- Launches, and the mixer renders correctly — presets, layer cards, evidence
+  badges, locked-layer state, sliders, bottom bar.
+- Session restore works: the saved mix and scene come back.
+- **Audio runs.** Tapping Play opens a real `AAudio` output stream
+  (`AAUDIO_OK`, `requestStart` → state 4) through Oboe.
+- The sleep timer auto-starts on `audio:started` and counts down from 45:00.
+- **Background audio works** — the thing the Capacitor build never had. The
+  `mediaPlayback` foreground service comes up (`isForeground=true`,
+  `types=0x00000002`) with an ongoing `category=transport` notification on an
+  `audio_playback` channel.
+- The merged manifest carries **no `RECORD_AUDIO`**. The trust claim holds.
+
+Two real bugs were found by doing this, both now fixed, and neither was
+reachable without a device — see the `copyToChannel` and lazy-ad-SDK commits.
+
 ## NOT verified, and why
 
-**This build has never run on a device.** That is the headline. It type-checks
-clean under `tsc --strict` and Metro bundles it (1,698 modules), which proves every
-import resolves — but neither of those makes a sound. Everything below is unverified
-on hardware:
+**Whether you like how it sounds.** A stream opening is not a sound. Nobody has
+listened to this build, and the emulator is the wrong place to judge it. The
+soft-clip substitution in particular deserves ears on real headphones.
 
-- that it launches at all,
-- that the audio engine produces a real output stream,
-- how the synthesis actually sounds after the soft-clip change,
-- that the Skia scenes render correctly and hold their frame rate,
-- background audio, the media notification, and the wake lock,
-- every ad flow.
+**Anything beyond the first screen.** Bedside, breathing, the sheets, the moon
+tap, the Skia scenes under motion, and an overnight run are all still untested.
 
-**Getting it onto a phone is the single most valuable thing anyone can do next.**
+**Every ad flow**, for two reasons — the emulator cannot fill (below), and the
+ad SDK is currently excluded from the build (also below).
+
+**A rendered ad, and a real reward callback.** Unchanged from the previous build:
+this machine runs Norton, which intercepts HTTPS and re-signs every certificate with
+its own root CA. The Android emulator's trust store does not contain that root, so
+*every* HTTPS client inside the emulator fails certificate validation — including
+the Play Store's own sync. Install on a real phone on a normal network.
+
+## BLOCKER: the ad SDK does not build on Expo SDK 57
+
+`react-native-google-mobile-ads@16.4.0` (the latest) is **currently excluded
+from the native build** — `expo.autolinking.exclude` in `package.json`, and its
+config plugin is out of `app.json`. The app is fully functional without it and
+degrades to no ads, but it also earns nothing, so this has to be resolved.
+
+The cause is upstream, not ours. The library calls `AgeRestrictedTreatment`,
+which only exists in `play-services-ads` 25.3+, and 25.3+ is compiled with
+Kotlin 2.3.0 metadata. Expo SDK 57 ships Kotlin 2.1.20, which cannot read it.
+Every version was probed and there is no gap:
+
+| play-services-ads | Result |
+|---|---|
+| 24.5.0, 25.0, 25.1, 25.2 | `Unresolved reference 'AgeRestrictedTreatment'` |
+| 25.3.0, 25.4.0 | `metadata is 2.3.0, expected version is 2.1.0` |
+
+Ways out, best first:
+
+1. **Raise the project's Kotlin to 2.3.x** via `expo-build-properties`
+   (`android.kotlinVersion`), which also needs a matching `kspVersion` — Expo's
+   `kotlinVersion → kspVersion` map in `expo-modules-core` has no 2.3 entry and
+   falls back to a KSP that will not match. Setting `ext.kotlinVersion` by hand
+   in the generated `android/build.gradle` does **not** work; the Kotlin plugin
+   classpath resolves earlier, in plugin management.
+2. **Wait for Expo to move to Kotlin 2.3**, then just delete the exclusion.
+3. **Pin an older `react-native-google-mobile-ads`** whose Kotlin does not call
+   the 25.3-only API.
+
+Whichever you pick, re-add the plugin block to `app.json` and drop
+`expo.autolinking.exclude` from `package.json`, then prebuild and rebuild.
 
 **A rendered ad, and a real reward callback.** Unchanged from the previous build:
 this machine runs Norton, which intercepts HTTPS and re-signs every certificate with
