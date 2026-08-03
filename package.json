@@ -21,8 +21,10 @@
     "react-native-worklets": "0.10.1"
   },
   "devDependencies": {
+    "@types/node": "^26.1.2",
     "@types/react": "~19.2.2",
-    "typescript": "~6.0.3"
+    "typescript": "~6.0.3",
+    "vitest": "^4.1.10"
   },
   "scripts": {
     "start": "expo start",
@@ -32,6 +34,10 @@
     "apk:release": "cd android && gradlew.bat assembleRelease",
     "ios": "expo run:ios",
     "typecheck": "tsc --noEmit",
+    "pretest": "node scripts/check-test-env.mjs",
+    "test": "vitest run --config vitest.config.mts",
+    "test:watch": "vitest --config vitest.config.mts",
+    "test:bundle": "vitest run --config vitest.bundle.config.mts",
     "fix-truststore": "powershell -ExecutionPolicy Bypass -File scripts/fix-truststore.ps1"
   },
   "private": true,
