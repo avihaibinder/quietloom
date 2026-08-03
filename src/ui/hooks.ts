@@ -20,6 +20,7 @@ import {
   type SoundId,
 } from '../types';
 import { getLayersVersion, subscribeLayers } from './layers';
+import { layerEqual } from './mixState';
 import { getSheetPayload, getSheetsVersion, isSheetOpen, subscribeSheets } from './sheets';
 import type { SheetId } from './sheets';
 import { SCENE_ACCENTS } from './theme';
@@ -148,22 +149,6 @@ let masterSnapshot = 0;
 const layerSnapshots = new Map<SoundId, LayerState>();
 const layerListeners = new Map<SoundId, Set<() => void>>();
 const masterListeners = new Set<() => void>();
-
-/** True when two layer states would render identically. Values, not identity. */
-function layerEqual(a: LayerState | undefined, b: LayerState | undefined): boolean {
-  if (a === b) return true;
-  if (!a || !b) return false;
-  if (a.enabled !== b.enabled || a.volume !== b.volume) return false;
-  const pa = a.params;
-  const pb = b.params;
-  if (pa === pb) return true;
-  if (!pa || !pb) return false;
-  // Both directions, so an added or removed param counts as a change. Params
-  // are plain number records, so a missing key compares as undefined.
-  for (const k in pa) if (pa[k] !== pb[k]) return false;
-  for (const k in pb) if (pb[k] !== pa[k]) return false;
-  return true;
-}
 
 function notifyAll(set: Set<() => void> | undefined): void {
   if (!set || set.size === 0) return;
