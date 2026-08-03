@@ -24,7 +24,12 @@
  * Sprites that are blitted 1:1 (the moon, the meadow) are built at env.dpr and
  * drawn back down to logical size — an offscreen Skia surface is a fixed pixel
  * buffer, unlike the live canvas which Skia renders at native resolution.
+ * env.dpr is capped at 2 because those two are big enough for memory, not
+ * sharpness, to be the binding constraint. The sheep's body is the exception
+ * and says why at ensureSheepBody().
  */
+
+import { PixelRatio } from 'react-native';
 
 import { createSprite, Gradient2D, type OffscreenSprite, type Ctx2D } from './canvas';
 import type { SceneEnv, SceneModule } from './types';
@@ -521,6 +526,121 @@ function buildMeadow(env: SceneEnv): void {
 
 const sheep = { active: false, x: 0, dir: 1, t: 0, speed: 0, nextAt: 0 };
 
+// The four leg pivots (x offset, gait phase) and four fleece puffs (x, y,
+// radius) are constant local-space geometry — hoisted out of drawSheep so
+// they are not two fresh tuple arrays every frame.
+const SHEEP_LEGS: Array<[number, number]> = [
+  [-6, 0],
+  [-2, Math.PI],
+  [3, Math.PI],
+  [7, 0],
+];
+
+const SHEEP_PUFFS: Array<[number, number, number]> = [
+  [-8, -3, 4.5],
+  [-2, -5.5, 5],
+  [4, -4.5, 4.5],
+  [9, -1, 4],
+];
+
+// Bounding box (local sheep space, unit = 1) of everything the sheep draws
+// EXCEPT the legs — fleece, puffs, tail, head and ear never change shape
+// frame to frame, only the legs swing. Padded a couple of units past the
+// drawn extents for stroke width and antialiasing.
+const SHEEP_BODY_X0 = -17;
+const SHEEP_BODY_Y0 = -13;
+const SHEEP_BODY_W = 37;
+const SHEEP_BODY_H = 22;
+
+let sheepBody: OffscreenSprite | null = null;
+let sheepBodyUnit = -1; // `unit` the cached sprite was rasterized at
+let sheepBodyScale = -1; // device-pixel scale the cached sprite was rasterized at
+
+/** Release the cached body sprite. The next sheep rebuilds it. */
+function releaseSheepBody(): void {
+  sheepBody?.dispose();
+  sheepBody = null;
+  sheepBodyUnit = -1;
+  sheepBodyScale = -1;
+}
+
+/**
+ * Fleece, puffs, tail, head and ear are constant in local space — only the
+ * sheep's position and its legs change frame to frame. Rasterize the static
+ * body once (invalidated only when `unit` or the device ratio change, i.e. on
+ * resize, not per frame) instead of rebuilding 8 fills' worth of Skia paths
+ * every frame a sheep is on screen.
+ *
+ * This one sprite is rasterized at the TRUE device pixel ratio, not at the
+ * capped `env.dpr`. The MAX_SPRITE_SCALE = 2 cap in renderer.ts is right for
+ * the meadow, which is `env.w * dpr` wide and where memory is the binding
+ * constraint. It is wrong for a ~73x46 px sheep: on a 2.6-2.8 ratio phone the
+ * cap would blit that into ~103 device px, a ~1.4x bilinear magnification of a
+ * small, high-contrast, MOVING silhouette at a fractional destination, every
+ * frame, on the first screen anyone sees. Going to the true ratio costs on the
+ * order of 10 KB more texture and it is the difference between resampling down
+ * and resampling up. env.dpr's meaning is unchanged; nothing else reads this.
+ */
+function ensureSheepBody(): OffscreenSprite {
+  const scale = Math.max(1, PixelRatio.get() || 1);
+  if (sheepBody && sheepBodyUnit === unit && sheepBodyScale === scale) return sheepBody;
+  releaseSheepBody();
+
+  const sprite = createSprite(SHEEP_BODY_W * unit * scale, SHEEP_BODY_H * unit * scale);
+  const g = sprite.ctx;
+  // Bake `unit` and the device scale into the raster so the sprite is exactly
+  // as crisp as the vector draws it replaces, and shift local space so
+  // SHEEP_BODY_X0/Y0 lands at the sprite's (0, 0).
+  g.setTransform(
+    unit * scale,
+    0,
+    0,
+    unit * scale,
+    -SHEEP_BODY_X0 * unit * scale,
+    -SHEEP_BODY_Y0 * unit * scale,
+  );
+
+  // fleece — a small cloud, never bright enough to light the room
+  g.globalAlpha = 0.82;
+  g.fillStyle = FLEECE;
+  g.beginPath();
+  g.ellipse(0, 0, 11.5, 7, 0, 0, TAU);
+  g.fill();
+  for (const [bx, by, br] of SHEEP_PUFFS) {
+    g.beginPath();
+    g.arc(bx, by, br, 0, TAU);
+    g.fill();
+  }
+
+  // tail
+  g.beginPath();
+  g.arc(-12, -2, 2.6, 0, TAU);
+  g.fill();
+  g.globalAlpha = 1;
+
+  // head and ear
+  g.fillStyle = DARK;
+  g.beginPath();
+  g.arc(13, -4, 3.8, 0, TAU);
+  g.fill();
+  g.strokeStyle = DARK;
+  g.beginPath();
+  g.moveTo(14.5, -6.5);
+  g.lineTo(17, -8.5);
+  g.lineWidth = 1.6;
+  // Not decoration: inline in drawSheep this stroke inherited lineCap='round'
+  // from the legs, which are set a few lines earlier and never reset. A fresh
+  // Ctx2D defaults to 'butt' (canvas.ts), and on a 1.6-wide, 3.2-long stroke
+  // the two round caps are 0.8 each — half the ear's length between them.
+  g.lineCap = 'round';
+  g.stroke();
+
+  sheepBody = sprite;
+  sheepBodyUnit = unit;
+  sheepBodyScale = scale;
+  return sprite;
+}
+
 function armSheep(time: number): void {
   sheep.active = false;
   sheep.nextAt = time + rand(SHEEP_GAP_MIN, SHEEP_GAP_MAX);
@@ -580,65 +700,42 @@ function drawSheep(ctx: Ctx2D, env: SceneEnv): void {
 
   const gait = hopping ? 0 : Math.sin(sheep.t * 9);
   const bob = hopping ? 0 : Math.abs(gait) * 1.3 * unit;
+  const tuck = hopping ? 2.5 : 0;
+
+  const body = ensureSheepBody();
 
   ctx.save();
   ctx.translate(x, y - bob);
-  ctx.scale(sheep.dir * unit, unit);
 
-  // legs
+  // legs — the only part of the sheep that actually animates frame to frame,
+  // so they stay live vector strokes, drawn first (the fleece sits over the
+  // top of them, as before).
+  ctx.save();
+  ctx.scale(sheep.dir * unit, unit);
   ctx.strokeStyle = DARK;
   ctx.lineWidth = 1.7;
   ctx.lineCap = 'round';
-  const tuck = hopping ? 2.5 : 0;
-  const legs: Array<[number, number]> = [
-    [-6, 0],
-    [-2, Math.PI],
-    [3, Math.PI],
-    [7, 0],
-  ];
-  for (const [lx, ph] of legs) {
+  for (const [lx, ph] of SHEEP_LEGS) {
     const swing = hopping ? 0 : Math.sin(sheep.t * 9 + ph) * 2.2;
     ctx.beginPath();
     ctx.moveTo(lx, 4);
     ctx.lineTo(lx + swing, 11 - tuck);
     ctx.stroke();
   }
+  ctx.restore();
 
-  // fleece — a small cloud, never bright enough to light the room
-  ctx.globalAlpha = 0.82;
-  ctx.fillStyle = FLEECE;
-  ctx.beginPath();
-  ctx.ellipse(0, 0, 11.5, 7, 0, 0, TAU);
-  ctx.fill();
-  const puffs: Array<[number, number, number]> = [
-    [-8, -3, 4.5],
-    [-2, -5.5, 5],
-    [4, -4.5, 4.5],
-    [9, -1, 4],
-  ];
-  for (const [bx, by, br] of puffs) {
-    ctx.beginPath();
-    ctx.arc(bx, by, br, 0, TAU);
-    ctx.fill();
-  }
-
-  // tail
-  ctx.beginPath();
-  ctx.arc(-12, -2, 2.6, 0, TAU);
-  ctx.fill();
-  ctx.globalAlpha = 1;
-
-  // head and ear
-  ctx.fillStyle = DARK;
-  ctx.beginPath();
-  ctx.arc(13, -4, 3.8, 0, TAU);
-  ctx.fill();
-  ctx.strokeStyle = DARK;
-  ctx.beginPath();
-  ctx.moveTo(14.5, -6.5);
-  ctx.lineTo(17, -8.5);
-  ctx.lineWidth = 1.6;
-  ctx.stroke();
+  // fleece, puffs, tail, head and ear — constant local geometry, blitted from
+  // the cached sprite instead of rebuilt path by path. `unit` is already
+  // baked into the sprite's raster, so only the left/right mirror is applied
+  // live here.
+  ctx.scale(sheep.dir, 1);
+  ctx.drawImage(
+    body,
+    SHEEP_BODY_X0 * unit,
+    SHEEP_BODY_Y0 * unit,
+    SHEEP_BODY_W * unit,
+    SHEEP_BODY_H * unit,
+  );
 
   ctx.restore();
 }
@@ -650,6 +747,10 @@ function build(env: SceneEnv): void {
   unit = Math.max(0.85, Math.min(1.7, Math.min(env.w, env.h) / 390));
   moonR = Math.round(Math.max(24, Math.min(48, 33 * unit)));
   moonAt = -1; // the cached position belongs to the old size
+  // `unit` has just moved, so the cached body sprite is the wrong size. Release
+  // the raster surface now rather than leaving it to the next sheep — a rotation
+  // is exactly when a scene should be giving memory back, not holding two.
+  releaseSheepBody();
 
   buildField(env);
   buildClouds(env);

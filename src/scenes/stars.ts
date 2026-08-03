@@ -112,6 +112,19 @@ function drawAurora(ctx: Ctx2D, env: SceneEnv, time: number): void {
   ctx.globalCompositeOperation = 'source-over';
 }
 
+/**
+ * One draw call per star, at the star's exact alpha.
+ *
+ * This was briefly batched into one path per quantised opacity level. The
+ * quantisation was reverted on the CEO's ruling: the absolute error was small
+ * (under 4/255 on the brightest star) but it is not spread evenly — at low
+ * scene intensity the faintest stars came out up to ~68% brighter than
+ * intended and twinkled across only two discrete levels, which partly
+ * collapses the dimmer-means-further depth cue over the faint half of the
+ * field. Twinkling is the only thing this scene does. The paint dirty-flag
+ * cache in canvas.ts still takes this loop from 6 native calls per star to 2,
+ * which is the bulk of the win and costs no pixels at all.
+ */
 function drawField(ctx: Ctx2D, env: SceneEnv, dt: number, twinkle: boolean): void {
   ctx.fillStyle = '#dfe7f5';
   for (const s of field) {

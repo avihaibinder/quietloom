@@ -13,6 +13,14 @@ export const SWELL_PERIOD = 10; // seconds — 0.1 Hz. Do not change.
 
 const BAND_COUNT = 7;
 
+// Constant, fully-opaque color strings. The per-band, per-frame alpha used to
+// be baked into a fresh `rgba(...)` string (parsed by Skia.Color every time,
+// and fast enough to overflow the adapter's 512-entry color cache); it is now
+// applied through ctx.globalAlpha instead, so these two strings are the only
+// waves colors Skia.Color ever has to parse.
+const CREST_FILL = 'rgb(64, 138, 150)';
+const CREST_STROKE = 'rgb(150, 220, 218)';
+
 interface Band {
   t: number;
   baseY: number;
@@ -106,14 +114,17 @@ function drawBands(ctx: Ctx2D, env: SceneEnv, time: number): void {
     ctx.closePath();
 
     const crest = 0.5 + 0.5 * swell;
-    ctx.fillStyle = `rgba(64, 138, 150, ${(b.alpha * (0.7 + 0.5 * crest)).toFixed(4)})`;
+    ctx.globalAlpha = b.alpha * (0.7 + 0.5 * crest);
+    ctx.fillStyle = CREST_FILL;
     ctx.fill();
 
     // a thin brighter line along the crest
-    ctx.strokeStyle = `rgba(150, 220, 218, ${(0.05 + b.t * 0.1 * (0.5 + crest)).toFixed(4)})`;
+    ctx.globalAlpha = 0.05 + b.t * 0.1 * (0.5 + crest);
+    ctx.strokeStyle = CREST_STROKE;
     ctx.lineWidth = 1;
     ctx.stroke();
   }
+  ctx.globalAlpha = 1;
 }
 
 export const waves: SceneModule = {

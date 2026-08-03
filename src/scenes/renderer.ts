@@ -5,6 +5,7 @@
  *   Scenes.setNightMode(bool)
  *   Scenes.pause() / Scenes.resume()
  *   Scenes.getScene() / Scenes.isRunning()
+ *   Scenes.refresh()
  *
  * This holds the scene state and composes a frame; SceneView owns the only
  * clock and calls in. That split is deliberate — the state has to be readable
@@ -169,6 +170,11 @@ export const Scenes = {
   setScene(name: SceneId): void {
     const next = SCENES[name];
     if (!next) return;
+    // Re-selecting the scene that is already on screen used to re-run init():
+    // for moonrise that is nine offscreen raster surfaces, 42 shaders, 76
+    // paths and four Gaussian blurs, synchronously on the JS thread, for no
+    // visible change. Tapping the current preset is a normal thing to do.
+    if (next === current) return;
     currentName = name;
     current = next;
     if (env.w) next.init?.(env);
@@ -205,6 +211,22 @@ export const Scenes = {
   resume(): void {
     if (!paused) return;
     paused = false;
+    notify();
+  },
+
+  /**
+   * Re-ask "what should be on screen?" without changing anything here.
+   *
+   * The in-app reduced-motion setting lives in the store, not in this module,
+   * so flipping it changes the answer to reducedMotion() with nothing to
+   * notify anybody. pause()/resume() cannot stand in: both early-return when
+   * the state is already what was asked for, so turning reduced motion ON
+   * while audio is playing left the loop running at 24fps until some unrelated
+   * event happened to fire — all night, if nothing did.
+   *
+   * Whoever writes settings.reduceMotion must call this immediately after.
+   */
+  refresh(): void {
     notify();
   },
 

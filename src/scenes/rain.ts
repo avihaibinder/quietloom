@@ -37,6 +37,7 @@ interface DropLayer {
 let layers: DropLayer[] = [];
 let bg: Gradient2D | null = null;
 let mist: Gradient2D | null = null;
+let veil: Gradient2D | null = null;
 let flash = 0;
 let flashHue = 0;
 let nextFlash = 12;
@@ -57,6 +58,7 @@ function makeDrop(spec: LayerSpec, env: SceneEnv, seeded: boolean): Drop {
 function resetGradients(): void {
   bg = null;
   mist = null;
+  veil = null;
 }
 
 function ensureGradients(ctx: Ctx2D, env: SceneEnv): { bg: Gradient2D; mist: Gradient2D } {
@@ -74,6 +76,22 @@ function ensureGradients(ctx: Ctx2D, env: SceneEnv): { bg: Gradient2D; mist: Gra
   mist = m;
 
   return { bg: b, mist: m };
+}
+
+/**
+ * The still-frame veil depends only on viewport size (its colors are fixed),
+ * so — like bg/mist above — it is built once and invalidated by resize, not
+ * rebuilt on every still repaint. drawStill fires once per setIntensity tick
+ * while paused, i.e. many times a second while a slider is being dragged.
+ */
+function ensureVeil(ctx: Ctx2D, env: SceneEnv): Gradient2D {
+  if (veil) return veil;
+  const v = ctx.createLinearGradient(0, 0, env.w * 0.35, env.h);
+  v.addColorStop(0, 'rgba(127,168,221,0.07)');
+  v.addColorStop(0.5, 'rgba(127,168,221,0.02)');
+  v.addColorStop(1, 'rgba(127,168,221,0.06)');
+  veil = v;
+  return v;
 }
 
 export const rain: SceneModule = {
@@ -153,11 +171,7 @@ export const rain: SceneModule = {
     ctx.fillRect(0, 0, env.w, env.h);
 
     // a soft, still veil of falling light instead of frozen droplets
-    const veil = ctx.createLinearGradient(0, 0, env.w * 0.35, env.h);
-    veil.addColorStop(0, 'rgba(127,168,221,0.07)');
-    veil.addColorStop(0.5, 'rgba(127,168,221,0.02)');
-    veil.addColorStop(1, 'rgba(127,168,221,0.06)');
-    ctx.fillStyle = veil;
+    ctx.fillStyle = ensureVeil(ctx, env);
     ctx.fillRect(0, 0, env.w, env.h);
 
     ctx.fillStyle = grads.mist;
