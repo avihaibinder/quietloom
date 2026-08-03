@@ -3,6 +3,7 @@
  *   Scenes.setScene('rain'|'embers'|'waves'|'stars'|'moonrise')
  *   Scenes.setIntensity(0..1)
  *   Scenes.setNightMode(bool)
+ *   Scenes.setHidden(bool)            (additive)
  *   Scenes.pause() / Scenes.resume()
  *   Scenes.getScene() / Scenes.isRunning()
  *   Scenes.refresh()
@@ -27,7 +28,12 @@ import { AccessibilityInfo, PixelRatio } from 'react-native';
 
 import { getSettings } from '../core/store';
 import type { SceneId } from '../types';
-import type { Ctx2D } from './canvas';
+// Tokens only, and the one direction this module reads the UI's palette: the
+// backdrop below is the same gradient the mixer's accent is derived from, so
+// keeping a second copy here would be a colour drift waiting to happen.
+// theme.ts imports nothing but types, so there is no cycle.
+import { SCENE_ACCENTS } from '../ui/theme';
+import type { Ctx2D, Gradient2D } from './canvas';
 import { embers } from './embers';
 import { moonrise } from './moonrise';
 import { rain } from './rain';
@@ -57,9 +63,21 @@ const env: SceneEnv = {
 let currentName: SceneId = 'rain';
 let current: SceneModule = rain;
 let paused = true;
+let hidden = false;
 let loopRunning = false;
 let systemReduceMotion = false;
 let version = 0;
+
+/**
+ * The backdrop gradient, built once per scene and viewport.
+ *
+ * Same caching rule as every scene's own gradients: a Gradient2D is a plain
+ * descriptor that builds its SkShader on first use and memoizes it, so it
+ * outlives the per-frame Ctx2D and must be invalidated by hand when either the
+ * colours (setScene) or the height it was measured against (setViewport)
+ * change. Null means "rebuild on the next paint".
+ */
+let backdrop: Gradient2D | null = null;
 
 const listeners = new Set<() => void>();
 
@@ -84,6 +102,15 @@ export function getSceneEnv(): SceneEnv {
 
 export function isPaused(): boolean {
   return paused;
+}
+
+/**
+ * Is the scene off screen entirely? True while the mixer is up: that screen
+ * gets the flat backdrop below instead of a sleepscape, so there is nothing to
+ * animate and SceneView cancels its loop exactly as it does for `paused`.
+ */
+export function isHidden(): boolean {
+  return hidden;
 }
 
 /** The setting or the OS switch. Either one means completely still. */
@@ -121,6 +148,7 @@ export function setViewport(w: number, h: number): void {
   env.h = height;
   env.dpr = Math.min(PixelRatio.get(), MAX_SPRITE_SCALE);
   env.area = (width * height) / REFERENCE_AREA;
+  backdrop = null; // measured against env.h
 
   if (first) current.init?.(env);
   else current.resize?.(env);
@@ -150,9 +178,42 @@ function nightPass(ctx: Ctx2D): void {
   ctx.restore();
 }
 
+/**
+ * The mixer's background: the current scene's own top/bottom tones as a still
+ * vertical gradient, and nothing else — no moon, no stars, no particles.
+ *
+ * It reads from SCENE_ACCENTS, which is also where the mixer's accent colour
+ * comes from, so the backdrop and the play button stay the same family as the
+ * preset changes underneath them.
+ */
+function paintBackdrop(ctx: Ctx2D): void {
+  if (!backdrop) {
+    const { top, bottom } = SCENE_ACCENTS[currentName];
+    const g = ctx.createLinearGradient(0, 0, 0, env.h);
+    g.addColorStop(0, top);
+    g.addColorStop(1, bottom);
+    backdrop = g;
+  }
+  ctx.fillStyle = backdrop;
+  ctx.fillRect(0, 0, env.w, env.h);
+}
+
 /** Compose one frame. `animate: false` draws the scene's still composition. */
 export function paintFrame(ctx: Ctx2D, dt: number, animate: boolean): void {
   if (!env.w || !env.h) return;
+
+  // Hidden wins over everything. The scene module is not consulted at all —
+  // not draw, not drawStill — so the mixer costs one gradient rect and the
+  // scene's particles, sprites and clocks sit idle until a surface that
+  // actually shows them comes up.
+  if (hidden) {
+    paintBackdrop(ctx);
+    // Unreachable while `hidden` only ever means "the mixer is up" and `night`
+    // only ever means bedside. Kept so the two stay composable if that changes.
+    nightPass(ctx);
+    return;
+  }
+
   ctx.save();
   if (animate) current.draw(ctx, env, dt);
   else if (current.drawStill) current.drawStill(ctx, env);
@@ -177,6 +238,7 @@ export const Scenes = {
     if (next === current) return;
     currentName = name;
     current = next;
+    backdrop = null; // different scene, different tones
     if (env.w) next.init?.(env);
     notify();
   },
@@ -198,6 +260,23 @@ export const Scenes = {
 
   setNightMode(on: boolean): void {
     env.night = !!on;
+    notify();
+  },
+
+  /**
+   * Take the scene off screen (true) or put it back (false).
+   *
+   * Separate from pause() on purpose, and it is not a stronger pause: paused
+   * still means "the scene, held still", which is a moon and a sky full of
+   * stars sitting behind the mixer. Hidden means the scene is not on that
+   * screen at all — see paintFrame. The composition root sets it from
+   * 'screen:changed', so welcome, bedside and breathing keep their sleepscape
+   * and the mixer does not.
+   */
+  setHidden(on: boolean): void {
+    const next = !!on;
+    if (next === hidden) return;
+    hidden = next;
     notify();
   },
 

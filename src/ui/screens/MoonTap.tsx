@@ -7,6 +7,10 @@
  * On the moon or not at all. The dot is centred on the moon and nowhere else:
  * a dot hunting for clear sky stops reading as "this moon has something to
  * say" and starts reading as a stray control. It is suppressed whenever
+ *   - the scene is hidden, i.e. there is no moon on screen to point at. The
+ *     mixer draws a flat backdrop, but moonrise stays the selected scene
+ *     underneath it and keeps reporting a moon position — so this check is
+ *     what stops a dot from floating over an empty gradient,
  *   - moonrise is not the current scene,
  *   - a sheet or an overlay is open (a tap at 3am in bedside mode must exit
  *     bedside, exactly as it does today),
@@ -26,7 +30,7 @@ import { AppState, StyleSheet, useWindowDimensions, View, type LayoutRectangle }
 
 import { EVIDENCE } from '../../data/evidence';
 import { moonTarget } from '../../scenes/moonrise';
-import { Scenes } from '../../scenes/renderer';
+import { isHidden, Scenes } from '../../scenes/renderer';
 import { InfoDot } from '../components/controls';
 import { useBusEvent, useLayersVersion } from '../hooks';
 import { anyLayerOpen } from '../layers';
@@ -90,6 +94,7 @@ export function MoonTap({ avoidRects = [] }: MoonTapProps): React.JSX.Element | 
 
   let scene: string | null = null;
   try {
+    if (isHidden()) return null;
     scene = Scenes.getScene();
   } catch {
     /* renderer is optional */

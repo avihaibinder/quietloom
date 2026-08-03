@@ -125,12 +125,21 @@ from outside a component calls `notifySettingsChanged()`.
 ## 6. Scenes contract (implemented, frozen)
 
 `Scenes.setScene('rain'|'embers'|'waves'|'stars'|'moonrise')` · `setIntensity(0..1)` ·
-`setNightMode(bool)` · `pause()` · `resume()` · plus `getScene()` and `isRunning()`.
+`setNightMode(bool)` · `setHidden(bool)` · `pause()` · `resume()` · plus `getScene()` and
+`isRunning()`.
 
 - Capped at 24 fps by a frame-time accumulator inside `SceneView`.
 - The loop is **fully cancelled** when the app is backgrounded, when paused (audio stopped or
-  bedside on), or when reduced motion is active — the setting *or* the OS switch. `pause()` settles
-  to a still composition rather than freezing a half-drawn frame.
+  bedside on), when hidden, or when reduced motion is active — the setting *or* the OS switch.
+  `pause()` settles to a still composition rather than freezing a half-drawn frame.
+- **`setHidden(true)` is not a stronger `pause()`.** Paused means the scene, held still — a moon
+  and a sky full of stars, not moving. Hidden means the scene is not on that surface at all:
+  `paintFrame` never consults the scene module and paints one flat vertical gradient in the
+  current scene's `SCENE_ACCENTS` top/bottom tones instead. The composition root drives it off
+  `screen:changed`, and **only the mixer is hidden** — welcome, bedside and breathing keep their
+  sleepscape. `MoonTap` suppresses itself while hidden: moonrise stays the selected scene under
+  the backdrop and keeps reporting a moon position, which would otherwise put an info dot on an
+  empty gradient.
 - Scenes no longer publish accent colours. `SCENE_ACCENTS` in `src/ui/theme.ts` owns the palette
   and `useSceneAccent()` is how a component reads it.
 - `waves` crest period is `SWELL_PERIOD = 10s` (0.1 Hz), matched to `OCEAN_HZ`. Keep them equal.

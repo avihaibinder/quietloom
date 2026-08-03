@@ -251,6 +251,12 @@ function Root(): React.JSX.Element {
     void Native.keepAwake(sleeping);
     void Native.backgroundMode(sleeping);
     Scenes.setNightMode(sleeping);
+
+    // The mixer gets a flat backdrop, not a sleepscape — the scene is for the
+    // surfaces you look at rather than the one you operate. Everything else
+    // (welcome, bedside, breathing) keeps it, and hiding it here also cancels
+    // the 24fps loop for as long as the mixer is up.
+    Scenes.setHidden(name === 'mixer');
   });
 
   useBusEvent('entitlements:changed', () => {

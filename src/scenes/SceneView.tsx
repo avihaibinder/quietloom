@@ -7,7 +7,8 @@
  * BreathingOverlay, which is precisely why the same clock bug shipped twice —
  * read that module's header before touching any of this.
  * The loop is FULLY cancelled — not just skipped — whenever the scene is
- * paused (audio stopped or bedside on), the app is backgrounded, or reduced
+ * paused (audio stopped or bedside on), hidden (the mixer is up, and gets a
+ * flat backdrop instead of a sleepscape), the app is backgrounded, or reduced
  * motion is on; each of those instead paints one still composition. That
  * guarantee is the whole battery story of an app that runs all night, and
  * nothing below is allowed to weaken it: the clock is still an ordinary rAF
@@ -41,6 +42,7 @@ import { Ctx2D } from './canvas';
 import {
   advance,
   getSceneEnv,
+  isHidden,
   isPaused,
   paintFrame,
   reducedMotion,
@@ -130,7 +132,7 @@ export function SceneView() {
     const evaluate = () => {
       const env = getSceneEnv();
       if (!env.w || !env.h) return;
-      if (!appActiveRef.current || isPaused() || reducedMotion()) {
+      if (!appActiveRef.current || isPaused() || reducedMotion() || isHidden()) {
         stopLoop();
         render(0, false);
       } else {
