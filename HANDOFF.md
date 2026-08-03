@@ -15,8 +15,14 @@ owns what. Keep this file true as things change.
 ```powershell
 npm install
 npx expo prebuild --platform android
-npx expo run:android
+npm run fix-truststore     # only on a machine with TLS-inspecting antivirus
+npm run android            # debug build: Metro serves the JS, __DEV__ on
+npm run android:release    # release build: Hermes bytecode in the APK, __DEV__ off
 ```
+
+`npm run android` is the development loop. It is a **debug** build and it is a different
+performance class, not "release minus a bit" — **never judge how fast the app feels on it.**
+`README.md` § "Which build variant, and why it matters" has the full table.
 
 **Quietloom — Living Sleepscapes** (`com.quietloom.rn`) is a sleep-sounds app where
 every sound is synthesised in real time. There is not a single audio file in the
@@ -85,7 +91,19 @@ Run on a Pixel 9a emulator (Android 16), debug build, from a clean `expo prebuil
   `mediaPlayback` foreground service comes up (`isForeground=true`,
   `types=0x00000002`) with an ongoing `category=transport` notification on an
   `audio_playback` channel.
-- The merged manifest carries **no `RECORD_AUDIO`**. The trust claim holds.
+- The merged manifest carries **no `RECORD_AUDIO`** — verified on the **release** APK too
+  (`aapt2 dump permissions`), not just debug. The microphone trust claim holds.
+- **But the release manifest does declare `SYSTEM_ALERT_WINDOW`**, and it is ours, not
+  React Native's debug manifest: `expo prebuild` generates
+  `android/app/src/main/AndroidManifest.xml` from the template in
+  `@expo/config-plugins/build/plugins/withAndroidBaseMods.js:56-68`, which ships
+  `SYSTEM_ALERT_WINDOW`, `VIBRATE`, `READ_EXTERNAL_STORAGE` and `WRITE_EXTERNAL_STORAGE`
+  under a comment reading "OPTIONAL PERMISSIONS, REMOVE WHATEVER YOU DO NOT NEED". Nobody
+  removed them. The app uses none of the four. "Display over other apps" is a sensitive
+  permission, it is visible to every user on the store listing, and a Play reviewer will ask
+  a sleep app why it wants it. Fix in `app.json` — `android.blockedPermissions` (supported in
+  SDK 57, `@expo/config-plugins/build/android/Permissions.js:64`) — then prebuild and rebuild.
+  Do this before the first upload, not after.
 
 Two real bugs were found by doing this, both now fixed, and neither was
 reachable without a device — see the `copyToChannel` and lazy-ad-SDK commits.
@@ -223,7 +241,14 @@ the 8-hour run is not repeatable without the old harness.
    Switzerland). Fix before launching in Europe.
 3. **Real in-app purchase is a scaffold.** `src/services/billing.ts` has three
    `TODO(billing)` blocks containing the code to paste, targeting `react-native-iap`.
-4. **No release signing config.** Debug builds only.
+4. **No production upload keystore.** Note the correction: a release APK *is* buildable today.
+   `android/app/build.gradle` gives the `release` buildType `signingConfig signingConfigs.debug`,
+   so `npm run android:release` produces a real, installable, `__DEV__`-off APK — same
+   application ID as a debug build, so it installs straight over one. What is missing is a
+   **production upload key**: the debug keystore is a public, well-known key, it cannot be used
+   to publish, and the key you first upload with is permanent for the life of the listing.
+   Generate one, back it up somewhere that is not this machine, and enrol in Play App Signing
+   before the first upload. Nothing about this blocks sideloading or measuring today.
 5. **No audio measurement harness.** The renderer half died with the web app. The
    DSP is unmeasured in its current form.
 6. **Node count on rich presets was ~3,900** in the web engine. Flat and leak-free

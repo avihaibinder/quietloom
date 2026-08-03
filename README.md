@@ -37,7 +37,8 @@ API of the same shape, which is why the code reads as a transcription rather tha
 ```powershell
 npm install
 npx expo prebuild --platform android   # generates android/ from app.json
-npx expo run:android                   # build, install and launch
+npm run fix-truststore                 # re-point Gradle at the merged CA store (see gotcha 2)
+npm run android                        # build, install and launch — DEBUG
 npm run typecheck                      # tsc --noEmit, no device needed
 ```
 
@@ -53,6 +54,41 @@ script's `PATH` — without it the build dies on `mkdir: command not found`.
 There is no browser dev mode any more. The audio engine, the scenes and the ad SDK are all native
 modules, so a device or emulator is the development loop. `npm run typecheck` and Metro's bundler
 still catch most mistakes without one.
+
+### Which build variant, and why it matters
+
+`expo run:android` with no `--variant` gives you a **debug** build. A React Native debug build is
+not "release minus a bit" — it is a different performance class: dev-mode React with its extra
+checks, an unminified dev bundle served live by Metro over the wire, LogBox, and every `console.*`
+crossing the bridge. **Performance must never be judged on a debug build.** We lost a round to
+exactly that: a report of "the entire app is SUPER SLOW" turned out to be the only build anyone
+had ever run, and no release build existed to compare it with.
+
+| Command | What you get |
+|---|---|
+| `npm run android` | **Debug.** Metro serves the JS live, `__DEV__` on, `debuggable`. The daily loop. Never measure on it. |
+| `npm run android:optimized` | **`--variant debugOptimized`** (SDK 54+). The native C++ is rebuilt with `-DCMAKE_BUILD_TYPE=Release`, so Skia and the audio engine run at full speed while the debugger and Metro stay attached. It is still a *debuggable* variant, so the **JS is still the dev bundle** — it does nothing for the JS thread. A good middle step, not a stand-in for release. |
+| `npm run android:release` | **Release.** JS is compiled to Hermes bytecode and packaged into the APK, `__DEV__` off, no Metro, no LogBox. The only build a performance claim may rest on. |
+| `npm run apk:release` | The same release APK, **built but not installed** — use this when no device is attached. |
+
+The release APK lands at `android/app/build/outputs/apk/release/app-release.apk`. It is signed
+with the **debug** keystore (`android/app/build.gradle` gives the `release` buildType
+`signingConfig signingConfigs.debug`), which is fine for sideloading and for measurement — it has
+the same application ID as a debug build, so it installs straight over one — but it can never be
+uploaded to Play. See `HANDOFF.md` for that gap.
+
+`assembleRelease` builds all four ABIs. If you know the target device, restrict it — most of an
+APK this size is native libraries, so one ABI instead of four cuts both the build time and the
+artifact substantially:
+
+```powershell
+npm run apk:release -- -PreactNativeArchitectures=arm64-v8a
+```
+
+`arm64-v8a` covers every Android phone made in the last decade, including the Galaxy A56 we test
+on. `expo run:android` already does this automatically for **debug** builds when a device is
+attached, but not for release — so a release APK is much larger than the debug one unless you say
+so. Compare like with like when comparing sizes.
 
 ## Project layout
 

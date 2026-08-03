@@ -27,9 +27,12 @@
   "scripts": {
     "start": "expo start",
     "android": "expo run:android",
+    "android:optimized": "expo run:android --variant debugOptimized",
+    "android:release": "expo run:android --variant release",
+    "apk:release": "cd android && gradlew.bat assembleRelease",
     "ios": "expo run:ios",
-    "web": "expo start --web",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "fix-truststore": "powershell -ExecutionPolicy Bypass -File scripts/fix-truststore.ps1"
   },
   "private": true,
   "expo": {
