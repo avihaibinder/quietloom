@@ -1,18 +1,47 @@
+# dependencies
 node_modules/
-dist/
-.DS_Store
-*.log
 
-# Android build artifacts
-android/.gradle/
-android/build/
-android/app/build/
-android/local.properties
-android/.idea/
-android/app/src/main/assets/public/
-android/app/src/main/res/xml/config.xml
+# Expo
+.expo/
+dist/
+web-build/
+expo-env.d.ts
+
+# Generated native projects. `npx expo prebuild` rebuilds both from app.json,
+# so they are build output, not source. Anything you would be tempted to edit
+# by hand in there belongs in app.json or a config plugin instead.
+/ios
+/android
+
+# Metro
+.metro-health-check*
+
+# Native signing material — never commit a keystore
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
 *.keystore
 !debug.keystore
+.kotlin/
+*.orig.*
 
-# Rendered audio previews (regenerate with: node tools/render-samples.mjs)
+# debug
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+*.log
+
+# typescript
+*.tsbuildinfo
+
+# local env files
+.env*.local
+
+# Rendered audio previews (see tools/)
 samples/
+
+# macOS
+.DS_Store
+*.pem

@@ -1,11 +1,14 @@
 # Monetization wiring
 
-How `ads.js`, `native.js` and `billing.js` connect to the rest of Quietloom, what
+How `ads.ts`, `native.ts` and `billing.ts` connect to the rest of Quietloom, what
 they promise, and what the app owner still has to do.
 
-Status as of this build: **`src/main.js` and `src/ui/*` are already wired
-against this contract and verified on a device.** The sections below are the
-reference, not a to-do list — except for [What the owner must do](#what-the-owner-must-do).
+Status as of this build: **`App.tsx` and `src/ui/` are already wired against
+this contract.** The sections below are the reference, not a to-do list — except
+for [What the owner must do](#what-the-owner-must-do).
+
+The public APIs here survived the move from Capacitor to React Native unchanged.
+Where the platform forced a difference it is called out inline.
 
 ---
 
@@ -14,25 +17,22 @@ reference, not a to-do list — except for [What the owner must do](#what-the-ow
 Monetization comes up *behind* the UI. A slow or failed ad SDK must never be
 visible to someone who just wants rain.
 
-```js
-import { Ads }          from './services/ads.js';
-import { Native }       from './services/native.js';
-import { Billing }      from './services/billing.js';
-import { Entitlements } from './services/entitlements.js';
+```ts
+import { Ads }          from './src/services/ads';
+import { Native }       from './src/services/native';
+import { Billing }      from './src/services/billing';
+import { Entitlements } from './src/services/entitlements';
 ```
 
-1. Render the UI and attach the scene canvas.
+1. `hydrate()` the store, restore the session, render.
 2. `Billing.init()` — fire and forget, `.catch()` it. Currently a no-op.
 3. `Ads.init()` — fire and forget, `.catch()` it. Then, in `.then()`:
-   `await reconcileBanner()` and `await maybeOpeningInterstitial()`.
+   `reconcileBanner()` and `await maybeOpeningInterstitial()`.
 
 Never `await` either init on the critical path to first paint.
 
-`Native` needs no init. `Native.isNative()` is **synchronous and correct on the
-very first call**, including before any plugin has finished loading —
-`@capacitor/core` is imported statically for exactly this reason. (The
-`setTimeout(..., 0)` around the `[quietloom] ready` log in `main.js` is no longer
-necessary; harmless if left.)
+`Native` needs no init. `Native.isNative()` is synchronous and correct on the
+very first call — it reads `Platform.OS`.
 
 ---
 
@@ -40,29 +40,39 @@ necessary; harmless if left.)
 
 One rule, one function. Every state change funnels through `reconcileBanner()`:
 
-```js
-const allowed = onMixerScreen && !anySheetOpen && !Entitlements.isPremium();
+```ts
+const allowed = onMixerScreen && !anyLayerOpen() && !Entitlements.isPremium();
 allowed ? await Ads.showBanner() : await Ads.hideBanner();
 ```
 
-Call it on: `screen:changed`, `entitlements:changed`, any sheet open/close, and
-once after `Ads.init()` resolves.
-
-The native banner floats **above** the WebView, so it will sit on top of any
-open sheet or the bedside screen. Hiding it is not cosmetic — it is the
-difference between a usable sheet and a broken one.
+Call it on: `screen:changed`, `entitlements:changed`, any layer push/pop
+(`subscribeLayers`), and once after `Ads.init()` resolves.
 
 **Never show a banner on bedside or breathing.** See `research.md`: an ad on a
 sleep surface is a real harm, not just a taste question.
+
+### The one architectural difference from the web build
+
+`react-native-google-mobile-ads` renders the banner as a **React component**,
+not an SDK-positioned native overlay floating above a WebView. So:
+
+- `ads.ts` holds the caller's intent (`showBanner()` / `hideBanner()`) plus the
+  measured height, and still emits `ads:banner` with the same payload.
+- `AdBanner.tsx` turns that into pixels. It renders `null` unless the module
+  state says visible **and** ads may serve, so premium tears it down instantly.
+- `App.tsx` pins it directly above the transport bar.
+
+This removes a whole class of web-era bug: the banner can no longer paint on top
+of an open sheet, because it is inside the tree and below the sheet.
 
 ### Reserving space
 
 Listen for the bus event and pad the layout — do not hardcode 60px:
 
-```js
-bus.on('ads:banner', ({ visible, heightPx }) => {
-  document.documentElement.style.setProperty('--ad-h', visible ? `${heightPx}px` : '0px');
-});
+```ts
+useBusEvent('ads:banner', ({ visible, heightPx }) =>
+  setBannerH(visible ? Math.max(0, heightPx) : 0),
+);
 ```
 
 `Ads.bannerHeight()` returns the same number synchronously if you need it.
@@ -81,7 +91,7 @@ settled, when nothing else is happening.** The current guard is
 
 - not the first-ever launch (first impression > one impression),
 - ~1.4s after boot,
-- no sheet open, on the mixer, audio not already running.
+- no layer open, on the mixer, audio not already running.
 
 **Do not** wire it to `timer:done`, `audio:stopped`, or app resume. Those fire
 while the user is asleep or falling asleep.
@@ -93,18 +103,27 @@ full-screen ad can leave the banner state stale.
 
 ## 4. Rewarded video (the night pass)
 
-```js
+```ts
 const earned = await Ads.showRewarded();   // Promise<boolean>
 if (earned) Entitlements.grantNightPass(); // expires 11:00 local
 ```
 
-`true` **only** when AdMob fires the real `Rewarded` event. Dismissal, load
-failure, show failure, or 30 seconds of silence all resolve `false`. There is a
-hard 30s timeout so a wedged SDK can never wedge the paywall sheet. Listeners
-are torn down on every path, so repeated opens do not leak.
+`true` **only** when the SDK fires the real `EARNED_REWARD` event. Dismissal,
+load failure, show failure, or 30 seconds of silence all resolve `false`. There
+is a hard 30s timeout so a wedged SDK can never wedge the paywall sheet.
+Listeners are torn down on every path, so repeated opens do not leak.
 
-Gate the button on `Ads.isAvailable()` and show an honest "not available right
-now" when it is false, rather than a button that does nothing.
+### The grace rule — deliberate, do not "fix"
+
+`Ads.lastRewardedFailure()` returns `'unavailable' | 'declined' | null`.
+`'declined'` means an ad genuinely played and the user closed it early. That is
+the **only** case the paywall treats as a refusal; every other failure grants
+the pass anyway.
+
+Branch on this, never on `Ads.isAvailable()` — the SDK reports itself available
+as soon as it initialises, which stays true when the network cannot deliver a
+single impression. Nobody gets locked out of falling asleep because an ad server
+was having a bad night.
 
 ---
 
@@ -118,12 +137,12 @@ no wiring required. `Ads.setAdsDisabled(true)` exists as an explicit override
 You still want `reconcileBanner()` on `entitlements:changed` to tear down a
 banner that is already on screen.
 
-To demo the premium UI tonight without a Play Console:
+To demo the premium UI without a Play Console, in a dev build:
 
-```js
+```ts
 Billing.__grantPremiumForTesting(true);
-// or, from a connected DevTools console (chrome://inspect):
-window.__quietloom.grantPremium(true);
+// or, from a connected debugger console:
+globalThis.__quietloom.grantPremium(true);
 ```
 
 ---
@@ -132,78 +151,65 @@ window.__quietloom.grantPremium(true);
 
 | Event        | Payload                     | When |
 |--------------|-----------------------------|------|
-| `ads:banner` | `{ visible, heightPx }`     | Banner shown, hidden, resized by the SDK, or failed to load. Always emitted at least once per `showBanner()`/`hideBanner()` call, **including in a desktop browser** (`{visible:false, heightPx:0}`), so the UI can rely on it unconditionally. |
+| `ads:banner` | `{ visible, heightPx }`     | Banner shown, hidden, measured, or failed to load. Always emitted at least once per `showBanner()`/`hideBanner()` call, **including when ads cannot serve at all** (`{visible:false, heightPx:0}`), so the UI can rely on it unconditionally. |
 
-`ads.js` emits nothing else. `billing.js` emits `entitlements:changed` when the
-dev grant flips premium. `native.js` emits nothing.
+`ads.ts` emits nothing else. `billing.ts` emits `entitlements:changed` when the
+dev grant flips premium. `native.ts` emits nothing.
 
 ---
 
 ## 7. Native
 
-```js
+```ts
 Native.isNative()            // sync, correct immediately
 Native.platform()            // 'android' | 'ios' | 'web'
 Native.keepAwake(on)         // Promise<boolean> — true if a wake lock is held
 Native.backgroundMode(on)    // Promise<boolean> — see below
-Native.openUrl(url)          // http/https only; system browser on device
+Native.openUrl(url)          // http/https only; in-app browser
 Native.onBackButton(fn)      // returns unsubscribe; fn returns true if it consumed the press
 Native.onAppStateChange(fn)  // returns unsubscribe; fn(isActive)
 ```
 
 `onBackButton`: return `true` from your handler when you consumed the press
-(e.g. you closed a sheet). Return falsy and the app is **minimised**, not
-destroyed — someone pressing back at bedtime wants the rain to keep playing.
+(e.g. you closed a sheet). Return falsy and the system default happens — on a
+root activity that moves the task to the back rather than destroying it, so
+someone pressing back at bedtime keeps the rain playing.
 
 `keepAwake` and `backgroundMode` share one wake lock via independent request
 flags, so turning one off does not stomp the other.
 
-Every method is a silent no-op off-device.
-
 ---
 
-## 8. Background audio — the decision
+## 8. Background audio — RESOLVED
 
-**Decision: no background-mode plugin ships in this build.
-`Native.backgroundMode()` degrades to the screen wake lock.**
+**This was the biggest known gap in the Capacitor build. React Native closed it.**
 
-`@anuradev/capacitor-background-mode@7.2.1` was installed, `cap sync`'d, and its
-**merged** manifest inspected. It unions these into our AndroidManifest:
+`react-native-audio-api` provides a first-party Android foreground service of
+type `mediaPlayback`, an iOS `audio` background mode, and a lock-screen media
+notification with working transport controls. It is configured declaratively in
+[`app.json`](app.json) and wired in `src/audio/background.ts`:
 
-```
-android.permission.RECORD_AUDIO                    <- microphone, "dangerous"
-android.permission.SYSTEM_ALERT_WINDOW             <- draw over other apps
-android.permission.FOREGROUND_SERVICE_MICROPHONE
-android.permission.FOREGROUND_SERVICE_SPECIAL_USE
-android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS
-```
+- audio session options (`playback` category),
+- interruption observation,
+- `PlaybackNotificationManager` showing the enabled layers as the "artist" line,
+  hidden on stop — a stopped sleep app should leave no notification behind,
+- pause/play/stop from the notification driving `engine.stop()` / `engine.start()`.
 
-plus a service declared `foregroundServiceType="specialUse|microphone"` whose
-`PROPERTY_SPECIAL_USE_FGS_SUBTYPE` string claims the app must stay alive
-*"to receive messages and calls from third party SIP servers"*. Google reviews
-that string by hand at submission, and it is not true of this app.
+**Crucially, it needs no microphone permission.** That was the whole reason the
+Capacitor plugin was rejected: `@anuradev/capacitor-background-mode@7.2.1`
+unioned `RECORD_AUDIO`, `SYSTEM_ALERT_WINDOW` and
+`FOREGROUND_SERVICE_MICROPHONE` into the manifest, and declared a foreground
+service whose reviewer-facing string claimed the app talks to third-party SIP
+servers. A sleep app asking for the microphone is a trust catastrophe and a
+near-certain Play rejection.
 
-A sleep app that asks for the **microphone** is a trust catastrophe — users are
-in bed — and a near-certain Play review rejection. The Gradle build itself was
-fine; the problem is the shipped product. It was uninstalled, `cap sync` re-run,
-and the build re-verified clean (dependency tree back to 4 runtime packages).
+**Keep it that way.** No recording API is referenced anywhere in `src/audio/`,
+and nothing should introduce one. `AudioManager` exposes recording-permission
+helpers; they are not for us.
 
-**What we ship instead:** bedside mode holds a screen wake lock. `main.js`
-already calls `Native.keepAwake(true)` + `Native.backgroundMode(true)` on
-entering bedside. The screen stays on (the UI dims it to black), so the WebView
-is never suspended and the `AudioContext` keeps running. That is the intended
-overnight posture anyway, and it needs no extra permission.
-
-**Known limitation:** if the user presses Home or the screen locks, Android may
-eventually suspend or kill the WebView and audio stops. There is no media
-notification and no lockscreen transport.
-
-**The correct fix, when there is time:** a small first-party Android foreground
-service of type `mediaPlayback` driven by a `MediaSession`. The
-`FOREGROUND_SERVICE_MEDIA_PLAYBACK` permission is **already declared** in
-`AndroidManifest.xml`. It needs no extra permissions, gives a proper lockscreen
-transport, and passes Play review. It is a ~150-line Java change in
-`android/app/src/main/java/com/quietloom/sleepscapes/`, not a plugin install.
+Bedside mode still holds the screen wake lock. That is now a comfort feature —
+the dimmed red clock is the intended overnight posture — rather than the only
+thing keeping audio alive.
 
 ---
 
@@ -216,35 +222,36 @@ branch on `isAvailable()` and show "coming soon" rather than a dead button.
 Reasons the UI may receive (`BILLING_REASONS`): `unavailable`, `cancelled`,
 `already-owned` (returned with `ok:true`), `nothing-to-restore`, `error`.
 
-Wiring it later is three marked blocks — search `billing.js` for
-**`TODO(billing)`**. Each contains the exact code to paste. Product ID is
-`quietloom_premium_forever`. Note `cordova-plugin-purchase` attaches to
-`window.CdvPurchase`; it is **not** an ES module, so do not `import` it.
+Wiring it later is three marked blocks — search `src/services/billing.ts` for
+**`TODO(billing)`**. Each contains the code to paste, targeting
+`react-native-iap` (`npx expo install react-native-iap`, then a dev build — it
+will not run in Expo Go). Product ID is `quietloom_premium_forever`, a
+non-consumable.
 
 ---
 
 ## 10. Build & run
 
 ```powershell
-npm run android                          # build + sync + assemble + install + launch
-.\scripts\build-apk.ps1 -NoInstall       # build the APK only
-.\scripts\build-apk.ps1 -SkipEmulator    # use an attached phone, never boot an AVD
-.\scripts\build-apk.ps1 -Clean           # gradlew clean first
-.\scripts\run-emulator.ps1               # boot Pixel_9a and wait for sys.boot_completed
+npm install
+npx expo prebuild --platform android   # regenerate android/ from app.json
+npx expo run:android                   # build, install, launch
+.\scripts\run-emulator.ps1             # boot Pixel_9a and wait for sys.boot_completed
 ```
 
-`build-apk.ps1` forces `JAVA_HOME` to Android Studio's bundled **JBR 21**
-(Capacitor 7 will not build on this machine's default JDK 17), sets
-`ANDROID_HOME`, and re-checks after `cap sync` that the AdMob
-`APPLICATION_ID` meta-data is still in the manifest — losing it crashes the app
-at launch, and it is the classic post-sync regression.
+Use the Pixel_9a AVD specifically: it ships Google Play services, and AdMob will
+not serve even test ads on a plain AOSP image.
 
-APK: `android\app\build\outputs\apk\debug\app-debug.apk`
+`android/` is generated and git-ignored. The AdMob application IDs live in the
+`react-native-google-mobile-ads` plugin block of `app.json`, which is what writes
+them into the manifest — so the classic Capacitor regression (losing the
+`APPLICATION_ID` meta-data on re-sync and crashing at launch) cannot happen here.
+Any manifest edit made by hand is thrown away on the next prebuild.
 
-Both scripts are **ASCII-only on purpose.** Windows PowerShell 5.1 reads a
-BOM-less UTF-8 `.ps1` as CP1252, where an em dash's third byte (`0x94`) becomes
-a smart quote `”` — which PowerShell treats as a *string delimiter*. One em dash
-in a comment will break the whole script with errors pointing 30 lines away.
+Both PowerShell scripts are **ASCII-only on purpose.** Windows PowerShell 5.1
+reads a BOM-less UTF-8 `.ps1` as CP1252, where an em dash's third byte (`0x94`)
+becomes a smart quote which PowerShell treats as a *string delimiter*. One em
+dash in a comment breaks the whole script with errors pointing 30 lines away.
 Keep them ASCII, or save as UTF-8 **with BOM**.
 
 ---
@@ -253,43 +260,36 @@ Keep them ASCII, or save as UTF-8 **with BOM**.
 
 ### Before any public release — blocking
 
-1. **Replace the three test ad unit IDs** in `src/services/ads.js` (`AD_UNITS`,
+1. **Replace the three test ad unit IDs** in `src/services/ads.ts` (`AD_UNITS`,
    marked at the top of the file) with real units from the AdMob console, and
    set `TEST_MODE = false` on the line below them.
-2. **Replace the AdMob application ID** in
-   `android/app/src/main/AndroidManifest.xml` —
-   `com.google.android.gms.ads.APPLICATION_ID` is currently Google's public test
-   ID `ca-app-pub-3940256099942544~3347511713`.
-   Leaving the test app-ID with real units, or vice versa, means zero revenue.
-3. **Delete `Billing.__grantPremiumForTesting()` and the `window.__quietloom` block**
-   at the bottom of `src/services/billing.js`. It grants premium to anyone who
-   opens DevTools.
-4. **AdMob policy:** apps serving ads to EEA/UK users need a consent flow. The
-   plugin ships a UMP wrapper (`AdMob.requestConsentInfo()` /
-   `showConsentForm()` — see `@capacitor-community/admob`'s consent module).
-   Not wired; nothing calls it yet.
+2. **Replace the AdMob application IDs** in the
+   `react-native-google-mobile-ads` plugin block of `app.json` — currently
+   Google's public test IDs. Leaving a test app-ID with real units, or vice
+   versa, means zero revenue.
+3. **Confirm the dev backdoor is absent from the release bundle.**
+   `Billing.__grantPremiumForTesting()` and the `globalThis.__quietloom` block
+   are gated on `__DEV__`, which Metro replaces with `false` and strips in a
+   production build. Verify it rather than assume it — the web build's
+   equivalent was checked against the shipped bundle, and this one should be too.
+4. **AdMob policy:** apps serving ads to EEA/UK/Swiss users need a consent flow.
+   `react-native-google-mobile-ads` bundles the UMP SDK
+   (`AdsConsent.requestInfoUpdate()` / `showForm()`). **Not wired; nothing calls
+   it yet.** This is both a policy problem and lost revenue (non-personalised
+   ads only) — fix before launching in Europe.
 5. **Play Data Safety form** must declare the AdMob SDK's advertising-ID
-   collection. The `com.google.android.gms.permission.AD_ID` permission is
-   already declared.
-6. Release builds need a real signing config — `android/app/build.gradle` has
-   only the debug default.
+   collection.
+6. Release builds need a real signing config and an upload keystore.
 
 ### Known environment issues on this machine
 
-- **Test ads cannot fill on this emulator.** Norton's TLS interception re-signs
-  HTTPS with `CN=Norton Web/Mail Shield Root`, which the emulator's 149-cert
-  system trust store does not contain. *Every* HTTPS client inside the emulator
-  fails with `ERR_CERT_AUTHORITY_INVALID` (`net_error -202`) — the Google Play
-  Store itself cannot sync. The Ads SDK therefore reports
-  `Ad failed to load : 0` (INTERNAL_ERROR).
-  This is **not** an app bug: the request path is verified correct
-  (right unit IDs, `isTesting:true`, adaptive banner, bottom-center) and the app
-  degrades gracefully. To see a real test ad, either turn off Norton's HTTPS
-  scanning, install its root into the emulator's system store, or **install the
-  APK on a real phone on a network Norton is not intercepting** — easiest by far.
-- **`scripts/fix-truststore.ps1` currently does not parse** (3 syntax errors) —
-  it has the em-dash/CP1252 problem described above, on lines 8, 22 and 46.
-  Replace its em dashes with `-` and it will run. Worth fixing before you need
-  it, because you will only need it when the build is already broken.
-- Gradle's build cache is deliberately **off** in `android/gradle.properties`;
-  on Windows with AV active it fails packing the dex tree.
+- **Test ads may not fill on this emulator.** Norton's TLS interception re-signs
+  HTTPS with `CN=Norton Web/Mail Shield Root`, which the emulator's system trust
+  store does not contain, so *every* HTTPS client inside the emulator fails
+  certificate validation — the Play Store itself cannot sync. The Ads SDK then
+  reports a load failure that is **not** an app bug. To see a real test ad,
+  either turn off Norton's HTTPS scanning, install its root into the emulator's
+  system store, or **install on a real phone on a normal network** — easiest by
+  far, and still the single most valuable unverified thing on the list.
+- Gradle's build cache should stay **off** on this machine; with AV active it
+  intermittently fails packing the dex tree.

@@ -49,8 +49,8 @@ you opened Quietloom, which sounds you chose, or how long you slept.
 all — you can verify this yourself on the app's page in Google Play, under "App permissions".
 Because the permission is absent, the app is technically incapable of accessing the microphone.
 
-Every sound Quietloom plays is generated mathematically on your device, in real time, using the Web Audio
-API. The app contains no audio recordings, and it does not download, stream or upload any audio.
+Every sound Quietloom plays is generated mathematically on your device, in real time. The app
+contains no audio recordings, and it does not download, stream or upload any audio.
 
 ## 5. Advertising — the one place data is involved
 

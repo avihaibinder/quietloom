@@ -1,5 +1,5 @@
 ﻿/*
- * Reads the rendered WAVs and reports what each one actually is, so the
+ * Reads WAVs from samples/ and reports what each one actually is, so the
  * synthesis can be judged on a machine with no speakers.
  *
  *   node tools/analyse-samples.mjs
@@ -8,6 +8,25 @@
  * Crest factor and transient count separate a droplet/crackle texture from flat
  * hiss. Slow modulation depth is what makes the ocean read as waves rather than
  * a drone - and its period should come out at 10 s, which is the 0.1 Hz pacer.
+ *
+ * NOTE ON WHERE THE SAMPLES COME FROM.
+ * Its companion, render-samples.mjs, drove the old Web Audio engine through an
+ * OfflineAudioContext in headless Chrome. That engine is gone with the web app,
+ * so nothing in this repo renders samples any more and this file is currently a
+ * measuring stick with nothing on the bench. It is kept because the
+ * measurements themselves are the valuable part - they are what caught wind
+ * being 12 dB too quiet and fire putting 87% of its energy below 200 Hz, both
+ * of which calculation had missed.
+ *
+ * To put it back to work, point it at any WAV of the engine's output: a screen
+ * recording pulled off a device, or a rebuilt renderer. Rebuilding the renderer
+ * is not much work - react-native-audio-api is Web Audio shaped, so src/audio
+ * runs in a browser behind a shim that maps 'react-native-audio-api' onto the
+ * native AudioContext (plus an onEnded -> onended alias and an AppState stub).
+ *
+ * One methodological warning worth keeping: use the A-weighted column. The ear
+ * is ~25 dB less sensitive at 100 Hz than at 3 kHz, so unweighted numbers made
+ * the fire fix look like it had failed when it had not.
  */
 
 import fs from 'node:fs';

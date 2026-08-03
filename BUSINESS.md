@@ -16,8 +16,8 @@ job gated behind a few slower administrative steps.
 
 ### The product in one paragraph
 
-Quietloom is an Android sleep-sounds app in which every sound is synthesised in real time by the Web
-Audio API. There are no audio files in the project at all. Rain is filtered noise shaped by a
+Quietloom is an Android sleep-sounds app in which every sound is synthesised in real time on the
+device. There are no audio files in the project at all. Rain is filtered noise shaped by a
 stochastic droplet model; ocean is a 0.1 Hz swell envelope over band-limited noise; fire is
 crackle transients over a low rumble. All of it is multiplied by a slow 1/f amplitude envelope,
 which is the difference between "a noise generator" and "rain". Four sounds are free forever, the
@@ -168,7 +168,7 @@ real harm to the person you are supposed to be helping, and it is also the faste
 one-star reviews in a category where reviews are everything.
 
 **In-app purchase — "Premium forever", `quietloom_premium_forever`, $4.99.** Every layer, every scene,
-no ads, forever. The scaffold exists in `src/services/billing.js` but is currently a stub that
+no ads, forever. The scaffold exists in `src/services/billing.ts` but is currently a stub that
 reports "coming soon", so the paywall gracefully falls back to offering the free rewarded unlock.
 Wiring it is step 9 of the checklist.
 
@@ -301,21 +301,22 @@ Each gives you an **ad unit ID** that looks like `ca-app-pub-1234567890123456/11
 separator and the suffix differ. Mixing up `~` and `/` is the most common go-live mistake and it
 produces ads that silently never load.
 
-**Step 4. Put your real IDs into the code.** Three edits, in two files.
+**Step 4. Put your real IDs into the code.** Two edits, in two files.
 
-**4a. `src/services/ads.js`, lines 43–47.** Replace all three test IDs:
+**4a. `src/services/ads.ts`, in the `AD_UNITS` block at the top of the file.** It currently uses
+the library's `TestIds` constants, which are Google's public test units:
 
-```js
+```ts
 export const AD_UNITS = {
-  banner: 'ca-app-pub-3940256099942544/6300978111', // TEST banner
-  interstitial: 'ca-app-pub-3940256099942544/1033173712', // TEST interstitial
-  rewarded: 'ca-app-pub-3940256099942544/5224354917', // TEST rewarded video
+  banner: TestIds.ADAPTIVE_BANNER,
+  interstitial: TestIds.INTERSTITIAL,
+  rewarded: TestIds.REWARDED,
 };
 ```
 
 becomes:
 
-```js
+```ts
 export const AD_UNITS = {
   banner: 'ca-app-pub-YOURPUBID/YOURBANNERUNIT',
   interstitial: 'ca-app-pub-YOURPUBID/YOURINTERSTITIALUNIT',
@@ -323,49 +324,31 @@ export const AD_UNITS = {
 };
 ```
 
-**4b. `src/services/ads.js`, line 50.** This flag is passed to `AdMob.initialize()` as
-`initializeForTesting` and to every `showBanner` / `prepareInterstitial` / `prepareRewardVideoAd`
-call as `isTesting`. While it is `true` you get test ads no matter what IDs you use.
+Set `TEST_MODE = false` on the line below at the same time. While it is `true` the unit IDs above
+are ignored in favour of the test ones, so changing one without the other does nothing.
 
-```js
-const TEST_MODE = true;
+**4b. `app.json`, the `react-native-google-mobile-ads` plugin block.** Replace both test
+application IDs — these use a tilde, not a slash:
+
+```json
+[
+  "react-native-google-mobile-ads",
+  {
+    "androidAppId": "ca-app-pub-3940256099942544~3347511713",
+    "iosAppId": "ca-app-pub-3940256099942544~1458002511"
+  }
+]
 ```
 
-becomes:
+becomes your real app IDs. The plugin writes them into the generated manifest at prebuild time.
+Do **not** try to edit the manifest directly — see the gotcha below. The Google Mobile Ads SDK
+crashes the app at launch if the application ID is missing entirely.
 
-```js
-const TEST_MODE = false;
-```
-
-**4c. `android/app/src/main/AndroidManifest.xml`, lines 43–45.** Replace the test application ID —
-this one uses a tilde:
-
-```xml
-<meta-data
-    android:name="com.google.android.gms.ads.APPLICATION_ID"
-    android:value="ca-app-pub-3940256099942544~3347511713" />
-```
-
-becomes:
-
-```xml
-<meta-data
-    android:name="com.google.android.gms.ads.APPLICATION_ID"
-    android:value="ca-app-pub-YOURPUBID~YOURAPPIDSUFFIX" />
-```
-
-Do **not** delete this tag. The Google Mobile Ads SDK crashes the app at launch if it is missing
-entirely.
-
-**4d. `capacitor.config.json`.** Set `"webContentsDebuggingEnabled": false` before a production
-build. It is currently `true` for development, and leaving it on lets anyone attach Chrome DevTools
-to your shipped app.
-
-> **The gotcha that will get you.** `android/app/src/main/assets/public/` contains a *compiled copy*
-> of the web app. Editing `src/services/ads.js` changes nothing in the APK until you rebuild. After
-> every one of these edits you must run `npm run sync` (which does `vite build` then
-> `npx cap sync android`) before you build the AAB. Ship without it and you have quietly released
-> the test IDs.
+> **The gotcha that will get you.** `android/` is *generated*. `npx expo prebuild` rewrites it from
+> `app.json`, so any hand-edit to `AndroidManifest.xml` or a Gradle file is silently discarded on
+> the next build. Native configuration belongs in `app.json` or a config plugin. (This replaces the
+> old Capacitor trap, which was the exact opposite: there, `android/` held a compiled copy of the
+> web app and you had to remember to re-sync after every source edit.)
 
 **Step 5. Test with real IDs safely — register your device as a test device.** Once `TEST_MODE` is
 `false` you are requesting live ads. Tapping one yourself, even accidentally, is invalid traffic,
@@ -397,17 +380,17 @@ takes ten minutes.
 4. Wait. AdMob re-crawls roughly every 24 hours and the status in the console changes from "not
    found" to "authorised". Check back the next day.
 
-**Step 7. [COMPLIANCE GAP] Implement the EEA consent form.** `src/services/ads.js` does not
+**Step 7. [COMPLIANCE GAP] Implement the EEA consent form.** `src/services/ads.ts` does not
 currently call Google's User Messaging Platform. Under the GDPR and Google's own EU user consent
 policy, you must collect consent before serving personalised ads to users in the EEA, the UK or
 Switzerland. Without it you are non-compliant, *and* you lose money: without consent Google serves
 only non-personalised ads to that traffic at a much lower eCPM.
 
-Configure the consent form in AdMob under *Privacy & messaging → GDPR*, then call the plugin's
-consent API before `AdMob.initialize()` in `Ads.init()`. `@capacitor-community/admob` exposes
-`requestConsentInfo()`, `showConsentForm()` and `resetConsentInfo()` for this. This is a small,
+Configure the consent form in AdMob under *Privacy & messaging → GDPR*, then call the UMP API
+before `mobileAds().initialize()` in `Ads.init()`. `react-native-google-mobile-ads` bundles it as
+`AdsConsent` (`requestInfoUpdate()`, `loadAndShowFormIfRequired()`, `reset()`). This is a small,
 contained change and it belongs before your first production release. Note that the app already sets
-`maxAdContentRating: 'General'`, which keeps the ad inventory tame — keep that.
+`maxAdContentRating: G`, which keeps the ad inventory tame — keep that.
 
 ### Google Play Console
 
@@ -499,26 +482,28 @@ android {
 APK.
 
 ```bash
-npm run sync
+npx expo prebuild --platform android
 cd android
 ./gradlew bundleRelease
 ```
 
 The bundle appears at `android/app/build/outputs/bundle/release/app-release.aab`. Upload that.
 
-Two things to remember on every subsequent release: bump `versionCode` in
-`android/app/build.gradle` (it is `1` today, and Play rejects a duplicate), and run `npm run sync`
-first so the bundled web assets are current. If Gradle fails with `PKIX path building failed`, that
-is the Norton truststore issue — see `README.md`.
+Two things to remember on every subsequent release: bump `version` and `android.versionCode` in
+`app.json` (Play rejects a duplicate `versionCode`), and re-run `expo prebuild` after any change to
+`app.json` — `android/` is generated, so an un-prebuilt change simply is not in the bundle. If
+Gradle fails with `PKIX path building failed`, that is the Norton truststore issue — see
+`README.md`.
 
 **Step 11. Wire real in-app purchases.** Do this *after* the app is live and you can see whether
 anyone is asking for it. It is the lowest-value item on this list and the fiddliest.
 
-1. Install the plugin and sync:
+1. Install the library and rebuild the native project:
    ```bash
-   npm install cordova-plugin-purchase@13.18.0
-   npx cap sync android
+   npx expo install react-native-iap
+   npx expo prebuild --platform android
    ```
+   It is a native module, so it needs a dev build — it will not run in Expo Go.
 2. In Play Console, go to *Monetize → Products → In-app products → Create product*. Product ID
    **`quietloom_premium_forever`** (this string must match exactly — it is `Billing.PRODUCT_ID` in the
    code), type **managed product** (one-time, not a subscription), price **$4.99**, then **activate
@@ -527,22 +512,21 @@ anyone is asking for it. It is the lowest-value item on this list and the fiddli
 3. Add yourself under *Setup → License testing* so you can make test purchases without being
    charged. Real purchase flows only work for a build installed *from Play* (internal testing track
    is fine) and signed with the upload key — you cannot test billing from a local debug APK.
-4. Implement `src/services/billing.js`. **Almost all of this work is already done for you.** The
+4. Implement `src/services/billing.ts`. **Almost all of this work is already done for you.** The
    module is a scaffold shaped exactly like the finished thing, and it contains three comment
    blocks marked `TODO(billing) 1 of 3 — INITIALISE`, `2 of 3 — PURCHASE` and `3 of 3 — RESTORE`.
-   Each one contains the actual `cordova-plugin-purchase` code, commented out, ready to paste in.
-   Those three blocks are the entire job. Two notes from the scaffold that will save you an hour:
-   the plugin attaches itself to `window` as `CdvPurchase` and is **not** an ES module, so do not
-   try to `import` it; and once billing is live, `PRICE_DISPLAY` should be overwritten at runtime
-   with the localised price the store reports rather than left as the hardcoded `'$4.99'`.
+   Each one contains the actual `react-native-iap` code, commented out, ready to paste in. Those
+   three blocks are the entire job. One note from the scaffold that will save you an hour: once
+   billing is live, `PRICE_DISPLAY` should be overwritten at runtime with the localised price the
+   store reports rather than left as the hardcoded `'$4.99'`.
 
-   The public API is a **frozen contract** — `src/ui/paywall.js` branches on every one of these:
+   The public API is a **frozen contract** — `src/ui/sheets/PaywallSheet.tsx` branches on every one of these:
 
    | Member | Contract |
    |---|---|
    | `PRODUCT_ID` | `'quietloom_premium_forever'`. Must match the Play Console product ID exactly. |
    | `PRICE_DISPLAY` | Display string. Replace at runtime with the store's localised price. |
-   | `init()` | `async`, must never throw. Called once at boot from `src/main.js`. |
+   | `init()` | `async`, must never throw. Called once at boot from `App.tsx`. |
    | `isAvailable()` | Synchronous boolean, currently `store !== null`. While `false` the paywall shows "Coming soon — the free unlock works tonight" instead of a dead button. |
    | `purchasePremium()` | Resolves `{ ok, reason?, productId? }`. |
    | `restore()` | Resolves `{ ok, reason? }`. Required by Play policy once IAP ships. |
@@ -554,13 +538,16 @@ anyone is asking for it. It is the lowest-value item on this list and the fiddli
    On `{ ok: true }` the paywall calls `Entitlements.setPremium(true)`, which permanently unlocks
    every layer and — via `Ads.setAdsDisabled(true)` — kills all advertising for that user.
 
-5. **[CRITICAL] Delete the dev backdoor before any public release.** `src/services/billing.js` ends
-   with a `__grantPremiumForTesting()` method and a `window.__quietloom.grantPremium()` handle, added so
-   the premium UI path could be demoed without a Play Console. It is flagged in the source with a
-   delete-before-release banner. Anyone who connects Chrome DevTools or `adb` to a shipped build can
-   call `window.__quietloom.grantPremium(true)` and unlock everything for free, permanently, with no
-   ads. Remove both the method and the `if (typeof window !== 'undefined')` block at the bottom of
-   the file. This is on the pre-flight checklist below for a reason.
+5. **[CRITICAL] Confirm the dev backdoor is absent from the release bundle.**
+   `src/services/billing.ts` ends with a `__grantPremiumForTesting()` method and a
+   `globalThis.__quietloom.grantPremium()` handle, added so the premium UI path could be demoed
+   without a Play Console. Anyone who can attach a debugger to a build that still contains it can
+   unlock everything for free, permanently, with no ads.
+
+   Both are gated on `__DEV__`, which Metro replaces with the literal `false` in a production
+   build, so the block is dead code and gets stripped. That is the intended protection — but
+   verify it rather than trust it, because the cost of being wrong is every paid layer given away.
+   This is on the pre-flight checklist below for a reason.
 
 **Step 12. Roll out.** Push to internal testing, then closed testing (this is where the twelve
 testers from step 0 come in), then a staged production rollout starting at 20%. Watch the crash-free
@@ -569,16 +556,16 @@ Google will start suppressing you in search.
 
 ### The five-minute pre-flight, before every production upload
 
-1. `AD_UNITS` in `src/services/ads.js` contains no `3940256099942544`.
-2. `TEST_MODE` in `src/services/ads.js` is `false`.
-3. `AndroidManifest.xml` `APPLICATION_ID` contains no `3940256099942544`, and uses `~` not `/`.
-4. `__grantPremiumForTesting` and the `window.__quietloom` block are **gone** from
-   `src/services/billing.js`. Grep the built bundle to be sure:
-   `grep -r "__quietloom" android/app/src/main/assets/public/` must return nothing.
-5. `webContentsDebuggingEnabled` is `false` in `capacitor.config.json`.
-6. `versionCode` in `android/app/build.gradle` has been incremented.
-7. `npm run sync` was run **after** all of the above.
-8. `app-ads.txt` shows "authorised" in AdMob.
+1. `AD_UNITS` in `src/services/ads.ts` contains no `3940256099942544` and no `TestIds`.
+2. `TEST_MODE` in `src/services/ads.ts` is `false`.
+3. The `react-native-google-mobile-ads` app IDs in `app.json` contain no `3940256099942544`, and
+   use `~` not `/`.
+4. `__quietloom` is **absent from the release bundle**. Prove it rather than assume it:
+   `npx expo export --platform android --output-dir /tmp/rel` then
+   `grep -r "__quietloom" /tmp/rel` must return nothing.
+5. `android.versionCode` in `app.json` has been incremented.
+6. `npx expo prebuild --platform android` was run **after** all of the above.
+7. `app-ads.txt` shows "authorised" in AdMob.
 
 ---
 
@@ -819,7 +806,7 @@ yours. Expect it to be removed anyway. Better still: spend two weeks genuinely a
 there first, and let people ask you what you built.
 
 **r/webaudio, r/javascript, r/programming** — a completely different and much friendlier story:
-"I synthesised rain, fire and ocean in the Web Audio API with no samples". Technical audiences love
+"I synthesised rain, fire and ocean with no samples at all". Technical audiences love
 this and there is no promotional stigma attached to showing your work. This is probably your best
 Reddit shot after r/AndroidApps.
 
@@ -918,8 +905,10 @@ percentage improvement in D7.
 **Open straight into the last mix.** `KEYS.lastMix` already exists in the store. One tap to sound,
 no menu. Reduces the friction of the nightly habit to nearly nothing.
 
-**A home-screen widget or quick-settings tile.** "Resume last mix" without opening the app. Cheap to
-build in Capacitor terms, and a persistent visual reminder on the user's home screen.
+**A home-screen widget or quick-settings tile.** "Resume last mix" without opening the app, and a
+persistent visual reminder on the user's home screen. This is real native work in React Native
+(a config plugin plus a Kotlin widget provider), so treat it as a week, not an afternoon. Note the
+lock-screen media notification already covers part of the same job for free.
 
 **A streak, done gently.** "You have wound down 7 nights in a row." Do not gamify it aggressively —
 this audience will find that obnoxious, and guilt-tripping someone about sleep is counterproductive.
@@ -962,7 +951,8 @@ will fix it.
 
 ### Deliberately not in the first 30 days
 
-**iOS.** Capacitor makes the port technically cheap, but it is not commercially cheap: $99/year, a
+**iOS.** React Native makes the port technically cheap — every dependency here is already
+cross-platform and `app.json` carries the iOS config — but it is not commercially cheap: $99/year, a
 review process that is far stricter than Google's, a completely separate ASO fight, and a second set
 of store assets. iOS users do pay more — meaningfully more — so this is a *good* second market. It
 is a terrible first one, because it doubles your surface area before you know whether the product
@@ -1002,10 +992,11 @@ of).
 
 ### Two Quietloom-specific things to keep an eye on
 
-**The grace rule.** `src/ui/paywall.js` deliberately grants the night pass when a rewarded ad
-returns false *and* `Ads.isAvailable()` is false — that is, when the ad system genuinely failed to
-initialise. This is the right call: nobody should be locked out of falling asleep because an ad
-server was slow. But it is also a revenue leak if the ad SDK is failing more often than you think.
+**The grace rule.** `src/ui/sheets/PaywallSheet.tsx` deliberately grants the night pass whenever a
+rewarded ad fails for any reason other than the user closing a real ad early
+(`Ads.lastRewardedFailure() !== 'declined'`). This is the right call: nobody should be locked out of
+falling asleep because an ad server was slow. But it is also a revenue leak if the ad SDK is failing
+more often than you think.
 Watch the ratio of rewarded impressions in AdMob against the app's daily actives. If impressions are
 far below what nightly usage implies, ads are failing to initialise for a large slice of users and
 they are all getting the pass for free. That is a bug worth chasing, not a policy to change.

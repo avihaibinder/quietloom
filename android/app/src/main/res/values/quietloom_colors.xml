@@ -1,5 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <!-- Same near-black the web layer uses, so there is no flash on hand-off. -->
-    <color name="quietloomNight">#05070C</color>
-</resources>

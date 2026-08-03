@@ -1,25 +1,35 @@
 {
-  "name": "quietloom",
-  "version": "0.1.0",
-  "private": true,
-  "type": "module",
-  "description": "Quietloom — Living Sleepscapes. Generative, research-backed sleep sounds.",
-  "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview",
-    "sync": "npm run build && npx cap sync android",
-    "android": "powershell -ExecutionPolicy Bypass -File scripts/build-apk.ps1"
-  },
+  "name": "rn",
+  "version": "1.0.0",
+  "main": "index.ts",
   "dependencies": {
-    "@capacitor/android": "7.6.8",
-    "@capacitor/app": "7.1.2",
-    "@capacitor/core": "7.6.8",
-    "@capacitor-community/admob": "7.2.0",
-    "@capacitor-community/keep-awake": "7.1.0"
+    "@react-native-async-storage/async-storage": "2.2.0",
+    "@react-native-community/slider": "5.2.0",
+    "@shopify/react-native-skia": "2.6.2",
+    "expo": "~57.0.9",
+    "expo-keep-awake": "~57.0.1",
+    "expo-status-bar": "~57.0.1",
+    "expo-web-browser": "~57.0.2",
+    "react": "19.2.3",
+    "react-native": "0.86.2",
+    "react-native-audio-api": "^0.13.2",
+    "react-native-gesture-handler": "~2.32.0",
+    "react-native-google-mobile-ads": "^16.4.0",
+    "react-native-reanimated": "4.5.1",
+    "react-native-safe-area-context": "~5.7.0",
+    "react-native-svg": "15.15.4",
+    "react-native-worklets": "0.10.1"
   },
   "devDependencies": {
-    "@capacitor/cli": "7.6.8",
-    "vite": "^7.0.0"
-  }
+    "@types/react": "~19.2.2",
+    "typescript": "~6.0.3"
+  },
+  "scripts": {
+    "start": "expo start",
+    "android": "expo run:android",
+    "ios": "expo run:ios",
+    "web": "expo start --web",
+    "typecheck": "tsc --noEmit"
+  },
+  "private": true
 }
