@@ -628,8 +628,9 @@ WHAT IS IN THE BOX
 · Pink, brown and white noise
 · Binaural beats at the exact frequencies that were actually tested — headphones required,
   because the effect physically cannot happen on a speaker
-· Deep Pulse: rhythmic pink-noise pulses modelled on a slow-wave enhancement protocol,
-  clearly labelled Experimental
+· Deep Pulse (Experimental): rhythmic pink-noise pulses at about 0.8 Hz, open-loop. The study
+  behind it used live EEG to time every pulse to a brain wave; we have no EEG, so we run the
+  rhythm and say so
 · Six curated presets built from element combinations that appear in the research
 · Layer anything with anything and save your own mixes
 

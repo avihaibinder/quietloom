@@ -250,8 +250,9 @@ export function PaywallSheet(): React.JSX.Element {
       {status ? <Text style={styles.status}>{status}</Text> : null}
 
       <Text style={styles.foot}>
-        Rain, Ocean, Pink noise and Brown noise stay free forever — those are the four with the
-        strongest evidence behind them. The paid layers are extras, not the product.
+        Rain, Ocean, Pink noise and Brown noise are free forever. Between them they cover the two
+        things the evidence supports best — nature sound for winding down, and steady masking for
+        falling asleep. Every layer shows its evidence badge, free or paid.
       </Text>
 
       {restoreRow}

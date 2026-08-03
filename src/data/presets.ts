@@ -99,9 +99,9 @@ export const PRESETS: Preset[] = [
   },
   {
     id: 'slow-wave',
-    name: 'Slow Wave',
+    name: 'Pulse Night',
     scene: 'stars',
-    note: 'Pink-noise pulses at 0.8 Hz, modelled on a slow-wave enhancement protocol. Experimental — see the evidence card.',
+    note: 'Experimental. Pink-noise pulses at 0.8 Hz, open-loop — we cannot phase-lock to your sleep without EEG. See the evidence card.',
     layers: {
       pink: { enabled: true, volume: 0.34 },
       deeppulse: { enabled: true, volume: 0.5 },

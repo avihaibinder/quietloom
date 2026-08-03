@@ -125,7 +125,8 @@ export const EVIDENCE: Record<string, EvidenceEntry> = {
   deeppulse: {
     title: 'Deep Pulse',
     badge: BADGE.EMERGING,
-    claim: 'Rhythmic pink-noise pulses modelled on a slow-wave enhancement protocol. Experimental.',
+    claim:
+      'Experimental. Rhythmic pink-noise pulses at about 0.8 Hz, open-loop — the rhythm of a tested protocol without the EEG targeting that made it work.',
     detail:
       'In older adults, pink-noise pulses delivered in blocks of five, phase-locked to the up-state of slow oscillations, increased slow-wave and spindle activity and improved next-morning word recall. Quietloom has no EEG, so it runs the same pulse pattern open-loop at about 0.8 Hz — the rhythm without the phase-locking. It is an approximation of the protocol, not the protocol.',
     sources: [

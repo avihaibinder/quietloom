@@ -34,7 +34,8 @@ export const COPY: Record<SoundId, string> = {
   brown: 'Deeper than pink. Most of its energy sits low, where traffic and footsteps live.',
   white: 'Flat and bright. Included because people like it — the evidence is thinner than the fame.',
   binaural: 'Two carriers, one per ear. Physically impossible on a speaker.',
-  deeppulse: 'Pink-noise pulses near 0.8 Hz, modelled on a slow-wave protocol. Experimental.',
+  deeppulse:
+    'Experimental. Pink-noise pulses near 0.8 Hz, open-loop — the rhythm without the EEG targeting.',
 };
 
 interface BinauralChipDef {
