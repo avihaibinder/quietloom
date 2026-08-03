@@ -52,7 +52,9 @@ export function SceneView() {
   const frame = useCallback(
     (now: number) => {
       rafRef.current = requestAnimationFrame(frame);
-      const dtMs = now - lastRef.current;
+      // -1 is "no previous frame". The first callback of a loop has nothing to
+      // measure against, and guessing costs a frame of motion at most.
+      const dtMs = lastRef.current < 0 ? 0 : now - lastRef.current;
       lastRef.current = now;
       accRef.current += dtMs;
       if (accRef.current < FRAME_MS) return;
@@ -73,7 +75,13 @@ export function SceneView() {
 
   const startLoop = useCallback(() => {
     if (rafRef.current) return;
-    lastRef.current = Date.now();
+    // NOT Date.now(). requestAnimationFrame hands `frame` performance.now() —
+    // milliseconds since the app started, not since 1970 — so seeding this with
+    // the wall clock made the first dtMs about -1.75e12. The accumulator went
+    // that far negative and never climbed back to a frame boundary, so the loop
+    // ran forever without ever painting: every scene anyone saw was a still
+    // frame from the paused path, and the sheep never got to walk.
+    lastRef.current = -1;
     // Prime the accumulator so the first frame paints immediately.
     accRef.current = FRAME_MS;
     reportLoopRunning(true);
