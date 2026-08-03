@@ -158,6 +158,17 @@ function restoreSession(): void {
   }
 }
 
+/** Do two rect lists describe the same layout? Compared by value, not identity. */
+function sameRects(a: LayoutRectangle[], b: LayoutRectangle[]): boolean {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    const p = a[i];
+    const q = b[i];
+    if (p.x !== q.x || p.y !== q.y || p.width !== q.width || p.height !== q.height) return false;
+  }
+  return true;
+}
+
 function Root(): React.JSX.Element {
   const insets = useSafeAreaInsets();
   const [avoidRects, setAvoidRects] = useState<LayoutRectangle[]>([]);
@@ -168,8 +179,21 @@ function Root(): React.JSX.Element {
   const screenRef = useRef<ScreenName>('welcome');
   const persistTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingState = useRef<EngineState | null>(null);
+  /** Last intensity handed to the renderer. NaN so the first publish always lands. */
+  const lastIntensity = useRef(Number.NaN);
 
   useTimerWiring();
+
+  /**
+   * MixerScreen republishes its control rects on a debounce, as a fresh array of
+   * fresh objects — so the identity always changed and `Root` re-rendered while
+   * the mixer was merely being scrolled. Root is the whole app: the scene, the
+   * mixer, the banner, the transport bar, four sheets and two overlays. Compare
+   * by value and swallow the no-op.
+   */
+  const publishAvoidRects = useCallback((rects: LayoutRectangle[]) => {
+    setAvoidRects((prev) => (sameRects(prev, rects) ? prev : rects));
+  }, []);
 
   /* ------------------------------------------------------------- banner --- */
 
@@ -256,10 +280,18 @@ function Root(): React.JSX.Element {
         if (s) write(KEYS.lastMix, { master: s.master, layers: s.layers });
       }, PERSIST_DEBOUNCE_MS);
     }
-    try {
-      Scenes.setIntensity(sceneIntensity(state));
-    } catch {
-      /* renderer is optional */
+    // `mix:changed` fires per touch-move while a slider is under a finger, and
+    // while the renderer is paused every setIntensity wakes a full still repaint
+    // — a new Ctx2D, a new SkPicture, the lot. The scene only cares about the
+    // derived intensity, which barely moves, so publish it only when it does.
+    const intensity = sceneIntensity(state);
+    if (intensity !== lastIntensity.current) {
+      lastIntensity.current = intensity;
+      try {
+        Scenes.setIntensity(intensity);
+      } catch {
+        /* renderer is optional */
+      }
     }
   });
 
@@ -355,7 +387,7 @@ function Root(): React.JSX.Element {
           should be tappable through a transparent overlay. */}
       {entered && (
         <>
-          <MixerScreen onControlsLayout={setAvoidRects} />
+          <MixerScreen onControlsLayout={publishAvoidRects} />
           <MoonTap avoidRects={avoidRects} />
           {/* AdBanner is layout-neutral by design; the root decides it sits
               directly above the transport bar and never over it. */}
