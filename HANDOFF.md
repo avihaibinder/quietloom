@@ -216,8 +216,10 @@ scripts/fix-truststore.ps1   Run this if Gradle starts failing with PKIX errors.
 scripts/run-emulator.ps1     Boots the Pixel_9a AVD (the one with Play services).
 ```
 
-**Two environment notes for this machine.** `JAVA_HOME` must point at Android
-Studio's bundled JBR — a system JDK 17 will not build current AGP. And Norton's TLS
-interception means Gradle needs a merged truststore; `scripts/fix-truststore.ps1`
-rebuilds it, and you must re-point `android/gradle.properties` at it after every
-prebuild because that file is generated.
+**Two environment notes for this machine.** `JAVA_HOME` needs a JDK 17 or newer —
+RN 0.86 compiles against 17, and the machine's existing `ms-17.0.15` is fine. (The
+old "must be Android Studio's JBR 21" rule was a Capacitor 7 constraint and no
+longer applies.) And Norton's TLS interception means Gradle needs a merged
+truststore; `scripts/fix-truststore.ps1` rebuilds it, and you must re-point
+`android/gradle.properties` at it after every prebuild because that file is
+generated.

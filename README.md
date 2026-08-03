@@ -77,17 +77,19 @@ tools/                   Audio measurement. Read the note at the top of analyse-
 Two things will waste an hour each if you do not know about them. Both are Gradle problems, so both
 still bite after `expo prebuild` even though there is no Capacitor left.
 
-### 1. `JAVA_HOME` must be Android Studio's JBR
+### 1. `JAVA_HOME` needs to be a JDK 17 or newer
 
-Recent AGP needs Java 17+ and is happiest on the JetBrains Runtime that ships inside Android
-Studio, not on a system JDK:
+React Native 0.86's Gradle plugin compiles against Java 17
+(`@react-native/gradle-plugin` → `JdkConfiguratorUtils.kt`), so 17 is the floor and 21 is fine too.
 
-```powershell
-$env:JAVA_HOME = 'C:\Program Files\Android\Android Studio\jbr'
-& "$env:JAVA_HOME\bin\java.exe" -version
-```
+On this machine `JAVA_HOME` is already `C:\Users\aviha\.jdks\ms-17.0.15`, which works. Android
+Studio's bundled JetBrains Runtime (`C:\Program Files\Android\Android Studio\jbr`, currently 21)
+is an equally good choice if you ever need to switch.
 
-Set it permanently in the user environment variables so `gradlew` picks it up in every new shell.
+> This used to be stricter. The Capacitor build specifically required Android Studio's JBR 21 and
+> would not build on a system JDK 17 — that constraint left with Capacitor. Ignore any older note
+> saying JBR is mandatory.
+
 Symptoms of getting this wrong are `Unsupported class file major version` or an AGP complaint about
 the JVM target.
 
